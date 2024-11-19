@@ -1,0 +1,209 @@
+GAMS 45.3.0  c4c31d8a Nov 11, 2023          WEX-WEI x86 64bit/MS Windows - 11/10/24 23:08:03 Page 1
+Procurement Planning under Stochastic Availability - Advanced Case
+C o m p i l a t i o n
+
+
+       
+      Course: Supply Chain Management
+      Section: 2.5 Procurement in Reverse Suppy Chains
+      Problem: Average-return MDP base model for procurement planning under stochastic availability and demand
+      Assumption: do not pay for undelivered items (necessiates larger state space)
+      Version 3: Avoid undershoot-specific rewards r
+       
+       - Model -
+       
+      Author: Christoph Schwindt
+      Date: 18/10/2024
+       
+  16   
+  18   
+  19  scalars
+  20     dmax    maximum demand / 10 /
+  21     xmax    maximum inventory level / 20 /
+  22     ymax    maximum availability / 15 /
+  23     pi      unit variable procurement cost / 5 /
+  24     h       unit holding cost / 1 /
+  25     k       fixed procurement cost / 2 /
+  26     v       unit shortage cost / 20 /
+  27     par_pD  parameter p in distribution of demand / 0.4 /
+  28     par_pY  parameter p in distribution of yield / 0.3 / ;
+  29   
+  34   
+  35  sets
+  36     x            number of inventory level (state) / x0*x30 /
+  37     q            order quantity (action) / q0*q15 /
+  38     q_of_x(x,q)  feasible order quantities in state x
+  39     d            demand / d0*d10 /
+  40     y            availability / y0*y15 / ;
+  41  *   u            undershoot q - y / u0*u%QMAX% / ;
+  42   
+  43  alias(x, xPrime) ;
+  44   
+  45  parameters
+  46     val(x)                  inventory level encoded by x
+  47     pD(d)                   probability of demand d
+  48     pY(y)                   probability of availability y
+  49     p(x,q,xPrime)           transition probability from x to xPrime given action q
+  50     r(x,q)                  expected reward for inventory x and action q ;
+  51  *   rbar(x,q)               expected reward for inventory x and order quantity q ;
+  52   
+  53     val(x) = ord(x)-1-dmax ;
+  54   
+  55     q_of_x(x,q) = no ;
+  56     q_of_x(x,q)$(ord(q)-1 le xmax-val(x)+dmax) = yes ;
+  57   
+  58     pD(d) = binomial(dmax, ord(d)-1)*par_pD**(ord(d)-1)*(1-par_pD)**(dmax-(ord(d)-1)) ;
+  59     pY(y) = binomial(ymax, ord(y)-1)*par_pY**(ord(y)-1)*(1-par_pY)**(ymax-(ord(y)-1)) ;
+  60   
+  61     r(x,q)$q_of_x(x,q) = -(pi*sum(y, pY(y)*min(ord(q)-1,ord(y)-1)) + h*max(0,val(x)) + k*(ord(q)>1) + v*max(0,-val(x))) ;
+  62  *   rbar(x,q) = sum((u,y)$(ord(u)-1=max(0, ord(q)-ord(y))), pY(y)*r(x,u,q)) ;
+  63   
+  64     p(x,q,xPrime)$q_of_x(x,q) = sum((d,y)$((val(xPrime) = min(max(val(x),0) + min(ord(q)-1,ord(y)-1)-(ord(d)-1), xmax))), pD(d)*pY(y)) ;
+  65   
+  66  variables
+  67     c       objective function = negative cost per unit time
+  68     b(x)    bias function value for state x
+  69   
+  70  equations
+  71     def_value_function(x,q)  definition of value function ;
+  72   
+  73     def_value_function(x,q)$q_of_x(x,q)..  c + b(x) =g= r(x,q) + sum(xPrime, p(x,q,xPrime)*b(xPrime)) ;
+  74   
+  75  model MDP / all / ;
+  76   
+  77  options lp = cplex
+  78          decimals = 8 ;
+  79   
+  80  MDP.optfile = 1 ;
+  85   
+  86  MDP.solprint = 2 ; // suppress entries in listing file
+  87   
+  88  b.fx(x)$(ord(x)=1) = 0 ; // remove degree of freedom such that g = max_q Q(x0,q)
+  89   
+  90  solve MDP using LP minimizing c ;
+  91   
+  92     def_value_function.m(x,q)$(def_value_function.m(x,q)=EPS) = 0 ; // put EPS values to zero
+  93   
+  94  set q_pol(x,q) optimal policy ;
+  95   
+  96     q_pol(x,q) = no ;
+  97     q_pol(x,q)$(q_of_x(x,q) and def_value_function.m(x,q)) = yes ;
+  98   
+  99  display c.l, b.l, q_pol, def_value_function.m ;
+ 100   
+ 101  scalars
+ 102     exp_inv        expected inventoty level
+ 103     max_inv        maximum inventory level
+ 104     exp_short      expeced shortage
+ 105     max_short      maximum shortage
+ 106     exp_ord_quant  expected order quantity ;
+ 107   
+ 108     exp_inv = sum(x$(val(x)>0), val(x)*sum(q, def_value_function.m(x,q))) ;
+ 109     max_inv = smax(x$((val(x) ge 0) and (sum(q, def_value_function.m(x,q))>0)), val(x)) ;
+ 110     exp_short = sum(x$(val(x)<0), -val(x)*sum(q, def_value_function.m(x,q))) ;
+ 111     max_short = smax(x$((val(x) le 0) and (sum(q, def_value_function.m(x,q)>0))), -val(x)) ;
+ 112     exp_ord_quant= sum(x, sum(q, (ord(q)-1)*def_value_function.m(x,q))) ;
+ 113   
+ 114  file policy / policy_availability_model_v3.txt / ;
+ 115  put policy ;
+ 116  put 'Optimal policy for availability model v3' / / ;
+ 117  put 'Inventory level', @17, '|', @19,
+ 118      'Order quantity', @34, '|', @36, 'Probability'/
+ 119      '=============================================='/
+ 120  ;
+ 121  loop(x,
+ 122      put val(x):15:0, @17, '|', @19, (max(0,smax(q$q_pol(x,q), ord(q)-1))):14:0,
+ 123          @34, '|', @36, sum(q, def_value_function.m(x,q)):11:9 / ;
+ 124  ) ;
+ 125  put /'Expected total cost per period:' @32, (-c.l):10:4/ ;
+ 126  put 'Expected inventory level:', @32, exp_inv:10:4/ ;
+ 127  put 'Maximum inventory level:', @32, max_inv:10:4/ ;
+ 128  put 'Expected shortage:', @32, exp_short:10:4/ ;
+ 129  put 'Maximum shortage:', @32, max_short:10:4/ ;
+ 130  put 'Expected order quantity:', @32, exp_ord_quant:10:4 ;
+ 131  putclose ;
+ 132   
+
+
+COMPILATION TIME     =        0.000 SECONDS      3 MB  45.3.0 c4c31d8a WEX-WEI
+GAMS 45.3.0  c4c31d8a Nov 11, 2023          WEX-WEI x86 64bit/MS Windows - 11/10/24 23:08:03 Page 2
+Procurement Planning under Stochastic Availability - Advanced Case
+E x e c u t i o n
+
+
+----     99 VARIABLE c.L                   =  -2.78597E+1  objective function = negative cost per unit time
+
+----     99 VARIABLE b.L  bias function value for state x
+
+x1  20.00000000,    x2  40.00000000,    x3  60.00000000,    x4  80.00000000,    x5  1.000000E+2,    x6  1.200000E+2,    x7  1.400000E+2,    x8  1.600000E+2,    x9  1.800000E+2,    x10 2.000000E+2,    x11 2.109496E+2,    x12 2.196967E+2,    x13 2.266003E+2,    x14 2.321623E+2,    x15 2.368811E+2,    x16 2.411516E+2,    x17 2.457332E+2,    x18 2.509466E+2,    x19 2.552455E+2,    x20 2.591010E+2,    x21 2.627758E+2,    x22 2.663101E+2,    x23 2.696219E+2,    x24 2.726499E+2,    x25 2.754008E+2,    x26 2.779042E+2,    x27 2.801701E+2,    x28 2.821901E+2,    x29 2.839569E+2,    x30 2.854705E+2
+
+
+----     99 SET q_pol  optimal policy
+
+             q0          q3          q4          q5          q6          q7          q8          q9
+
+x0                                                                                              YES
+x1                                                                                              YES
+x2                                                                                              YES
+x3                                                                                              YES
+x4                                                                                              YES
+x5                                                                                              YES
+x6                                                                                              YES
+x7                                                                                              YES
+x8                                                                                              YES
+x9                                                                                              YES
+x10                                                                                             YES
+x11                                                                                 YES
+x12                                                                     YES
+x13                                                         YES
+x14                                             YES
+x15                                 YES
+x16                     YES
+x17         YES
+x18         YES
+x19         YES
+
+
+----     99 EQUATION def_value_function.M  definition of value function
+
+             q0          q3          q4          q5          q6          q7          q8          q9
+
+x0                                                                                       0.00000009
+x1                                                                                       0.00000188
+x2                                                                                       0.00001968
+x3                                                                                       0.00013024
+x4                                                                                       0.00061381
+x5                                                                                       0.00219897
+x6                                                                                       0.00624749
+x7                                                                                       0.01452581
+x8                                                                                       0.02839176
+x9                                                                                       0.04791160
+x10                                                                                      0.07184724
+x11                                                                          0.09856303
+x12                                                              0.12609729
+x13                                                  0.14946891
+x14                                      0.15773664
+x15                          0.13907175
+x16              0.09507779
+x17  0.04616334
+x18  0.01396820
+x19  0.00196448
+
+
+**** REPORT FILE SUMMARY
+
+policy C:\Users\ericd\Documents\zweistufige-stochastische-produktionsplanung-mit-repetierfaktor-unsicherheit\documents\policy_availability_model_v3.txt
+
+
+EXECUTION TIME       =        0.656 SECONDS      6 MB  45.3.0 c4c31d8a WEX-WEI
+
+
+USER: Large MUD - 20 User License                    S220915|0002AN-GEN
+      TU Clausthal, Institute of Management and Economics        DC5575
+      License for teaching and research at degree granting institutions
+
+
+**** FILE SUMMARY
+
+Input      C:\Users\ericd\Documents\zweistufige-stochastische-produktionsplanung-mit-repetierfaktor-unsicherheit\documents\mdp_procurement_planning_availability_v3.gms
+Output     C:\Users\ericd\Documents\zweistufige-stochastische-produktionsplanung-mit-repetierfaktor-unsicherheit\documents\mdp_procurement_planning_availability_v3.lst
