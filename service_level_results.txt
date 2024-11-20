@@ -1,0 +1,10 @@
+Service Levels for Products:
+---------------------------
+Service Level for Product 1: 0.0000
+Service Level for Product 2: 0.2000
+Service Level for Product 3: 0.2000
+Service Level for Product 4: 0.0000
+Service Level for Product 5: 0.0000
+Service Level for Product 6: 0.0000
+
+Overall Service Level: 0.0000
