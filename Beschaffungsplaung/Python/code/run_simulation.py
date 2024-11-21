@@ -32,7 +32,7 @@ class MainWindow(QMainWindow):
 
         # Logo
         logo_label = QLabel()
-        logo_pixmap = QPixmap("Beschaffungsplaung\Python\logo.png").scaled(60, 60, Qt.KeepAspectRatio)  # Logo skalieren
+        logo_pixmap = QPixmap("Beschaffungsplaung\Python\documents\logo.png").scaled(60, 60, Qt.KeepAspectRatio)  # Logo skalieren
         logo_label.setPixmap(logo_pixmap)
         header_layout.addWidget(logo_label)
 
