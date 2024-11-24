@@ -1,107 +1,109 @@
-import gurobipy as gp
 from gurobipy import GRB
-import numpy as np
 from util import *
-np.random.seed(50)
 
+np.random.seed(101)
 
-# Define the model
-model = gp.Model("CircularEconomyProduction")
+# set up parameters
+T = 12  # number of periods
+n = 6   # number of products
+m = 4   # number of production factors
 
-# Set up parameters
-T = 5  # Example: number of periods
+I_A = range(min(2, m))
+d = [[np.random.randint(4, 8)*(1.1-np.sin(j+2*np.pi*t/T)) for t in range(T)] for j in range(n)]  # product demands
+p = [np.random.randint(120, 150) for _ in range(n)]   # product prices
+k = [np.random.randint(10, 20) for _ in range(n)]     # production cost
+h = [np.random.uniform(0.5, 2.5) for _ in range(n)]   # holding cost
+b = [np.random.randint(5, 10) for _ in I_A]           # procurement cost of secondary materials
+c = [np.random.randint(30, 60) for _ in I_A]          # procurement cost of corresponding primary materials
+A = [[np.random.randint(15, 35) for _ in range(T)] for _ in range(m)]  # availability of secondary materials (deterministic)                             # set of all secondary materials
+a = [[np.random.randint(0, 8) for _ in range(n)] for _ in range(m)]    # production coefficients
+I_minus_I_A = [i for i in range(m) if i not in I_A]   # set of non-secondary production factors
+R_fix = [[np.random.randint(50, 100) for _ in range(T)] for _ in I_minus_I_A]  # capacity of non-secondary production factors
+x_a = [np.random.randint(3, 5) for _ in range(n)]     # initial inventory levels of products
+R_a = [np.random.randint(10, 50) for _ in I_A]        # initial inventory levels of secondary materials
 
-n = 6  # Number of products
-m = 4  # Number of factors
+# declare model
+model = gp.Model("MPS_CE")
 
-d = [[np.random.randint(1, 100) for _ in range(T)] for _ in range(n)]  # products demand
-p = [np.random.randint(8, 15) for _ in range(n)]      # Prices of products
-k = [np.random.randint(5, 15) for _ in range(n)]      # Production cost
-h = [np.random.randint(1, 5) for _ in range(n)]       # Holding costs
-b = [np.random.randint(1, 3) for _ in range(m)]       # Procurement costs for factors
-c = [np.random.randint(4, 6) for _ in range(m)]       # Procurement cost of corresponding primary products
-A = [ [np.random.randint(30, 80) for _ in range(T)] for _ in range(m) ] # Availability of reusable factors (certain)
-I_A = list(np.random.choice(range(m), 3, replace=False) )          # Set of all reusable factors
-a = [ [np.random.randint(1, 3) for _ in range(n)] for _ in range(m) ]
-A_diff_I_A = [i for i in range(m) if i not in I_A] # the set of product factor that are not reusable
-x_a = [np.random.randint(3, 5) for _ in range(n)]  # start invertory level for each product 
-R_a =[np.random.randint(1, 5) for _ in I_A]  #start capacity for each reusable product
+# define variables
+# xjt: inventory level of product j at the end of period t
+# yjt: quantity of product j manufactured in period t
+# zjt: sales of product j in period t
+# Rit: inventory level of secondary material i
+# vit: procurement of secondary material i in period t
+# wit: procurement of primary material replacing secondary material i in period t
 
-# Define variables
-# xjt: Inventory level of product j at the end of period t
-# yjt: Quantity of factor i used in period t
-# zjt: Quantity of demand satisfied by product j in period t
-# vit: Procurement of factor i in period t
-# wit: Procurement of primary product replacing factor i in period t
-x = model.addVars(n, T+1, name="x", vtype=GRB.CONTINUOUS)  # inventory of product j at time t
-y = model.addVars(n, T, name="y", vtype=GRB.CONTINUOUS)  # use of factor i in period t
-z = model.addVars(n, T, name="z", vtype=GRB.CONTINUOUS)  # demand satisfied
-v = model.addVars(m, T, name="v", vtype=GRB.CONTINUOUS)  # procurement of reusable factor i
-w = model.addVars(m, T, name="w", vtype=GRB.CONTINUOUS)  # procurement of primary product replacing factor i
-R = model.addVars(m , T+1,name="R", vtype=GRB.CONTINUOUS )
+x = model.addVars(n, T+1, name="x", vtype=GRB.CONTINUOUS)
+y = model.addVars(n, T, name="y", vtype=GRB.CONTINUOUS)
+z = model.addVars(n, T, name="z", vtype=GRB.CONTINUOUS)
+v = model.addVars(m, T, name="v", vtype=GRB.CONTINUOUS)
+w = model.addVars(m, T, name="w", vtype=GRB.CONTINUOUS)
+R = model.addVars(m, T+1, name="R", vtype=GRB.CONTINUOUS)
 
-# Objective Function: Maximize profit
-model.setObjective(gp.quicksum(gp.quicksum(p[j]*z[j,t] - k[j]*y[j,t] - h[j]*x[j,t+1] for j in range(n))  
-                   - gp.quicksum(b[i]*v[i,t] + c[i]*w[i,t] for i in I_A ) for t in range(T)), GRB.MAXIMIZE)
+# objective function: maximize profit
+model.setObjective(gp.quicksum(gp.quicksum(p[j]*z[j, t] - k[j]*y[j, t] - h[j]*x[j, t+1] for j in range(n))
+                   - gp.quicksum(b[i]*v[i, t] + c[i]*w[i, t] for i in I_A) for t in range(T)), GRB.MAXIMIZE)
 
-# Constraints
-# 1. Resource constraints
+# constraints
+# 1. resource constraint for non-secondary production factors
 for t in range(T):
-    for i in A_diff_I_A:
-        model.addConstr(gp.quicksum(a[i][j]*y[j,t] for j in range(n)) <= R[i,t], 
-                        name=f"ResourceConstraint_{i}_{t}")
+    for i in I_minus_I_A:
+        model.addConstr(gp.quicksum(a[i][j]*y[j, t] for j in range(n)) <= R_fix[i-I_A.stop][t], name=f"ResourceConstraint_{i}_{t}")
 
-# 2. Inventory initialization
+# 2. inventory initialization
 for j in range(n):
-    model.addConstr(x[j,0] == x_a[j], name=f"InventoryInit_{j}")
+    model.addConstr(x[j, 0] == x_a[j], name=f"InventoryInitProduct_{j}")
 
-# 3. Inventory dynamics
+# 3. inventory balance
 for t in range(T):
     for j in range(n):
-        model.addConstr(x[j,t+1] == x[j,t] + y[j,t] - z[j,t], 
-                        name=f"InventoryDynamics_{j}_{t}")
+        model.addConstr(x[j, t+1] == x[j, t] + y[j, t] - z[j, t], name=f"InventoryBalanceProduct_{j}_{t}")
 
-# 4. Demand constraint
+# 4. sales constraint
 for t in range(T):
     for j in range(n):
-        model.addConstr(z[j,t] <= d[j][t], name=f"DemandConstraint_{j}_{t}")
+        model.addConstr(z[j, t] <= d[j][t], name=f"SalesConstraint_{j}_{t}")
 
-# 5. Non-negativity
+# 5. non-negativity constraints
 for t in range(T):
     for j in range(n):
-        model.addConstr(x[j,t+1] >= 0, name=f"NonNegativitX_{j}_{t}")
-        model.addConstr(y[j,t] >= 0, name=f"NonNegativityY_{j}_{t}")
-        model.addConstr(z[j,t] >= 0, name=f"NonNegativityZ_{j}_{t}")
+        model.addConstr(x[j, t+1] >= 0, name=f"NonNegativityX_{j}_{t}")
+        model.addConstr(y[j, t] >= 0, name=f"NonNegativityY_{j}_{t}")
+        model.addConstr(z[j, t] >= 0, name=f"NonNegativityZ_{j}_{t}")
 
-# 6. Initial Resource Allocation
+# 6. initial inventory secondary material
 for i in I_A:
-    model.addConstr(R[i,0] == R_a[i], name=f"InitialResourceAllocation_{i}")
+    model.addConstr(R[i, 0] == R_a[i], name=f"InventoryInitSecondary_{i}")
 
-# 7. Resource Dynamics
+# 7. inventory balance constraint secondary material
 for t in range(T):
     for i in I_A:
-        model.addConstr(R[i,t+1] == R[i,t] + v[i,t] + w[i,t] - gp.quicksum(a[i][j]*y[j,t] for j in range(n)),
-                        name=f"ResourceDynamics_{i}_{t}")
+        model.addConstr(R[i, t+1] == R[i, t] + v[i, t] + w[i, t] - gp.quicksum(a[i][j]*y[j, t] for j in range(n)),
+                        name=f"InventoryBalanceSecondary_{i}_{t}")
 
-# 8. Availability constraints
+# 8. availability constraint secondary material
 for t in range(T):
     for i in I_A:
-        model.addConstr(v[i,t] <= A[i][t], name=f"AvailabilityConstraint_{i}_{t}")
+        model.addConstr(v[i, t] <= A[i][t], name=f"AvailabilityConstraint_{i}_{t}")
 
-# 9. Non-negativity of Resources
+# 9. non-negativity of secondary material
 for t in range(T):
     for i in I_A:
-        model.addConstr(R[i,t+1] >= 0, name=f"NonNegativityResource_{i}_{t}")
-        model.addConstr(v[i,t] >= 0, name=f"NonNegativityV_{i}_{t}")
-        model.addConstr(w[i,t] >= 0, name=f"NonNegativityW_{i}_{t}")
+        model.addConstr(R[i, t+1] >= 0, name=f"NonNegativityR_{i}_{t}")
+        model.addConstr(v[i, t] >= 0, name=f"NonNegativityV_{i}_{t}")
+        model.addConstr(w[i, t] >= 0, name=f"NonNegativityW_{i}_{t}")
 
-# Solve the model
+# solve the model
 model.optimize()
 
 # save the solution if optimal
 if model.status == GRB.OPTIMAL:
-   save_results(model,x,y,z,w,v,R,T,n,d,I_A, "results_model")
+    predictive_CM = model.objVal
+    save_results(model, x, y, z, w, v, R, T, n, d, I_A, "results_model")
 
-
-real_DB_avg_rolling  = simulate_rolling_horizon(model,x, y,z,v,w, p,d,b,c,R,R_a, x_a,I_A, A_diff_I_A, k, h, n, T)
-print(f"Average Realized Contribution Margin (Rolling Horizon): {real_DB_avg_rolling}")
+num_exp = 100
+real_CM_avg = simulate_schedule(n, T, I_A, x, y, z, v, a, A, p, k, h, b, c, R_a, num_exp)
+real_CM_avg_rolling = simulate_rolling_schedule(model, n, T, I_A, I_minus_I_A, x, y, z, R, v, w, a, R_fix, d, A, p, k, h, b, c, num_exp)
+print(f"\n\nContribution margin predicted by expected value model: {predictive_CM}")
+print(f"Average realized contribution margin of schedule: {real_CM_avg}")
+print(f"Average realized contribution margin of rolling schedule: {real_CM_avg_rolling}")
