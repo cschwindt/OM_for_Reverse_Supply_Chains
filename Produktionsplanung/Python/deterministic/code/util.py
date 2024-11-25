@@ -163,7 +163,7 @@ def simulate_rolling_schedule(model, n, T, I_A, I_minus_I_A, x, y, z, R, v, w, a
 
 def save_results(model, x, y, z, w, v, R, T, n, d, I_A, filename):
     # check whether folder results exists; if not, create folder
-    with open(f"Produktionsplanung/Python/deterministic/results/{filename}.txt", "w") as f:
+    with open(f"./results/{filename}.txt", "w") as f:
         # Summary of key metrics
         f.write("Optimal circular master production schedule\n\n")
         f.write("------------------------------------------------------------\n")
