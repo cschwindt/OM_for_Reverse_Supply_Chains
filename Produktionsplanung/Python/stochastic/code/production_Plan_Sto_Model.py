@@ -1,14 +1,14 @@
 from gurobipy import GRB
-import numpy as np
 import gurobipy as gp
+from util_sto import *
 
 np.random.seed(101)
 
 # set up parameters
-T = 12  # number of periods
-n = 6   # number of products
-m = 4   # number of production factors
-q = 100 # number of samples
+T = 12   # number of periods
+n = 6    # number of products
+m = 4    # number of production factors
+q = 100  # number of samples
 
 I_A = range(min(2, m))
 d = [[np.random.randint(4, 8)*(1.1-np.sin(j+2*np.pi*t/T)) for t in range(T)] for j in range(n)]  # product demands
@@ -17,15 +17,17 @@ k = [np.random.randint(10, 20) for _ in range(n)]     # production cost
 h = [np.random.uniform(0.5, 2.5) for _ in range(n)]   # holding cost
 b = [np.random.randint(5, 10) for _ in I_A]           # procurement cost of secondary materials
 c = [np.random.randint(30, 60) for _ in I_A]          # procurement cost of corresponding primary materials
-A = [[[np.random.randint(15, 35) for _ in range(q)] for _ in range(T)] for _ in range(m)] # availability of secondary materials (stochastic)
+A = [[np.random.randint(15, 35) for _ in range(T)] for _ in range(m)]  # availability of secondary materials (stochastic)
 a = [[np.random.randint(0, 8) for _ in range(n)] for _ in range(m)]    # production coefficients
 I_minus_I_A = [i for i in range(m) if i not in I_A]   # set of non-secondary production factors
 R_fix = [[np.random.randint(50, 100) for _ in range(T)] for _ in I_minus_I_A]  # capacity of non-secondary production factors
 x_a = [np.random.randint(3, 5) for _ in range(n)]     # initial inventory levels of products
 R_a = [np.random.randint(10, 50) for _ in I_A]        # initial inventory levels of secondary materials
 
+A_l = [[[np.random.randint(0, 2*A[i][t]) for _ in range(q)] for t in range(T)] for i in range(m)]
+
 # declare model
-model = gp.Model("MPS_CE")
+model = gp.Model("MPS_CE_Sampling")
 
 # define variables
 # xjt: inventory level of product j at the end of period t
@@ -69,20 +71,20 @@ for t in range(T):
 # 6. initial inventory secondary material
 for l in range(q):
     for i in I_A:
-         model.addConstr(R[i, 0, l] == R_a[i], name=f"InventoryInitSecondary_{i}_{l}")
+        model.addConstr(R[i, 0, l] == R_a[i], name=f"InventoryInitSecondary_{i}_{l}")
 
 # 7. inventory balance constraint secondary material
 for l in range(q):
-     for t in range(T):
-         for i in I_A:
-             model.addConstr(R[i, t+1, l] == R[i, t, l] + v[i, t, l] + w[i, t, l] - gp.quicksum(a[i][j]*y[j, t] for j in range(n)),
-                        name=f"InventoryBalanceSecondary_{i}_{t}_{l}")
+    for t in range(T):
+        for i in I_A:
+            model.addConstr(R[i, t+1, l] == R[i, t, l] + v[i, t, l] + w[i, t, l] - gp.quicksum(a[i][j]*y[j, t]
+                for j in range(n)), name=f"InventoryBalanceSecondary_{i}_{t}_{l}")
 
 # 8. availability constraint secondary material
 for l in range(q):
     for t in range(T):
-         for i in I_A:
-              model.addConstr(v[i, t, l] <= A[i][t][l], name=f"AvailabilityConstraint_{i}_{t}_{l}")
+        for i in I_A:
+            model.addConstr(v[i, t, l] <= A_l[i][t][l], name=f"AvailabilityConstraint_{i}_{t}_{l}")
 
 # solve the model
 model.optimize()
@@ -92,3 +94,6 @@ if model.status == GRB.OPTIMAL:
     predictive_CM = model.objVal
     print(f"\n\nContribution margin predicted by sampling approximation: {predictive_CM}")
 
+num_exp = 100
+real_CM_avg = simulate_schedule(n, T, I_A, x, y, z, a, A, p, k, h, b, c, R_a, num_exp)
+print(f"Average realized contribution margin of schedule: {real_CM_avg}")
