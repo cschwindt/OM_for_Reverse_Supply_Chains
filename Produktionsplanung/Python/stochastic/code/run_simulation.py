@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import ( QApplication, QMainWindow, QVBoxLayout,
                              QHBoxLayout, QLabel, QLineEdit, QPushButton, QWidget, 
                              QGridLayout, QSizePolicy,QDesktopWidget, QShortcut, QFileDialog, QMessageBox)
 from PyQt5.QtGui import QFont, QPixmap , QKeySequence
-from model_Det_backend import *
+from model_Sto_backend import *
 from PyQt5.QtCore import Qt
 import sys
 
@@ -44,7 +44,7 @@ class MainWindow(QMainWindow):
         # 2. Layout: Input Fields for T, n, m
         self.param_inputs = {}
         self.params = {
-            "T (periods)": 2, "n (products)": 1, "m (factors)": 2, "alpha ": 1
+            "T (periods)": 2, "n (products)": 1, "m (factors)": 2, "alpha ": 1, "q (samples)": 100
         }
 
         param_layout = QHBoxLayout()
@@ -74,7 +74,7 @@ class MainWindow(QMainWindow):
         button_layout = QHBoxLayout()
 
         # Run Solver Button
-        self.run_button = QPushButton("Run MPS_CE")
+        self.run_button = QPushButton("Run MPS_CE_Sampling")
         self.run_button.setFont(QFont("Arial", 10, QFont.Bold))
         self.run_button.setStyleSheet("background-color: lightgreen;")
         self.run_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -300,7 +300,6 @@ class MainWindow(QMainWindow):
                 self.show_error_message(f"The Entry for '{key}' is not valid. Please enter a valid number.")
                 return  # Verhindere die Ausführung des Solvers, wenn Fehler aufgetreten ist
     
-        
         self.params = params
         # Solver aufrufen und Ergebnisse speichern
         self.results  = run_gurobi_solver(params , self.dynamic_widgets)

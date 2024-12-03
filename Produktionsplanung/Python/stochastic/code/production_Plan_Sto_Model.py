@@ -92,6 +92,7 @@ model.optimize()
 # save the solution if optimal
 if model.status == GRB.OPTIMAL:
     predictive_CM = model.objVal
+    save_results(model, x, y, z, w, v, q, 2, R, T, n, d, I_A, "results_model")
     print(f"\n\nContribution margin predicted by sampling approximation: {predictive_CM}")
 
 num_exp = 100
