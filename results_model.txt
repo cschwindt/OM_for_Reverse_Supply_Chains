@@ -1,0 +1,16 @@
+Optimal circular master production schedule
+
+------------------------------------------------------------
+ Product | Period | Inventory | Production | Sales | Demand 
+------------------------------------------------------------
+       1 |      1 |      1.00 |       0.00 |  1.00 |   2.20 
+       1 |      2 |      0.00 |       0.50 |  0.50 |   1.10 
+
+---------------------------------------------------------------------------------
+ Secondary m. | Period |  Inventory | Procurement sec. m. | Procurement prim. m. 
+---------------------------------------------------------------------------------
+            1 |      1 |       1.00 |                0.00 |                 0.00 
+            1 |      2 |       1.00 |                0.00 |                 0.00 
+
+Service level for product 1: 0.0000
+Total contribution margin: 2.5000

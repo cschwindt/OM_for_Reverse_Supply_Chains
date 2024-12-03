@@ -1,5 +1,6 @@
 import sys
 import openpyxl
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QWidget, QGridLayout, QSizePolicy
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QWidget, QPushButton,
     QTableWidget, QTableWidgetItem, QLabel, QLineEdit, QHBoxLayout, QFileDialog,QInputDialog,QDesktopWidget,QShortcut,
@@ -15,7 +16,7 @@ from PyQt5.QtCore import Qt
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-                # Bildschirmgröße ermitteln
+        # Bildschirmgröße ermitteln
         screen_geometry = QDesktopWidget().availableGeometry()
         screen_width = screen_geometry.width()
         screen_height = screen_geometry.height()
@@ -32,7 +33,7 @@ class MainWindow(QMainWindow):
 
         # Logo
         logo_label = QLabel()
-        logo_pixmap = QPixmap("Beschaffungsplaung\Python\documents\logo.png").scaled(60, 60, Qt.KeepAspectRatio)  # Logo skalieren
+        logo_pixmap = QPixmap("Beschaffungsplanung\Python\code\logo.png").scaled(60, 60, Qt.KeepAspectRatio)  # Logo skalieren
         logo_label.setPixmap(logo_pixmap)
         header_layout.addWidget(logo_label)
 
