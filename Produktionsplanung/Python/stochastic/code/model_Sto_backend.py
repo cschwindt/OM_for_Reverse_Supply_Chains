@@ -3,54 +3,10 @@ from util_sto import *
 
 np.random.seed(101)
 
-def run_gurobi_solver(params , params_inputs):
+def run_gurobi_solver(n, m, alpha, T, x_a, R_a, R_fix, a, A, b, c, h, k, p , d, q):
     
-    T  = int(params["T (periods)"]) # number of periods
-    n = int(params["n (products)"]) # number of products
-    m = int(params["m (factors)"])  # number of production factors
-    alpha = int(params["alpha "]) #number of secondary factors
-    I_A = range(alpha) # set of secondary factors
-    q = int(params["q (samples)"]) # samples
-
-    d = [[0.0]*T]*n
-    for j in range(n):
-          for t in range(T):
-                d[j][t] = float(params_inputs[f"d-{j+1}-{t+1}"].text())*(1.1-np.sin(j+2*np.pi*t/T))
-    p = [0.0]*n
-    for j in range(n):
-         p[j] = float(params_inputs[f"p-{j+1}"].text())
-    k = [0.0]*n
-    for j in range(n):
-         k[j] = float(params_inputs[f"k-{j+1}"].text())
-    h = [0.0]*n
-    for j in range(n):
-         h[j] = float(params_inputs[f"h-{j+1}"].text())
-    b = [0.0]*alpha
-    for i in range(alpha):
-        b[i] = float(params_inputs[f"b-{i+1}"].text())   
-    c = [0.0]*alpha
-    for i in range(alpha):
-        c[i] = float(params_inputs[f"c-{i+1}"].text()) 
-    A = [[0.0]*T]*m
-    for i in range(m):
-          for t in range(T):
-                A[i][t] = float(params_inputs[f"d-{j+1}-{t+1}"].text())
-    a = [[0.0]*n]*m
-    for i in range(m):
-        for j in range(n):
-                a[i][j] = float(params_inputs[f"a-{i+1}-{j+1}"].text())
+    I_A = range(alpha)
     I_minus_I_A = [i for i in range(m) if i not in I_A]  
-    R_fix = [[0.0]*T]*(m-alpha)
-    for i in range(m-alpha):
-        for t in range(T):
-                R_fix[i][t] = float(params_inputs[f"R_fix-{i+1}-{t+1}"].text())
-    x_a = [0.0]*n
-    for j in range(n):
-         x_a[j] = float(params_inputs[f"x_a-{j+1}"].text()) 
-    R_a = [0.0]*alpha
-    for i in range(alpha):
-         R_a[i] = float(params_inputs[f"Ra-{i+1}"].text())
-    
     A_l = [[[np.random.randint(0, alpha*A[i][t]) for _ in range(q)] for t in range(T)] for i in range(m)]
     
     # declare model
