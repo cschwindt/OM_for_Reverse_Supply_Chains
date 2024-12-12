@@ -70,15 +70,20 @@ def run_gurobi_solver(n, m, alpha, T, x_a, R_a, R_fix, a, A, b, c, h, k, p ,d):
 
     # save the solution if optimal
     if model.status == GRB.OPTIMAL:
-          predictive_CM = model.objVal
-          save_results(model, x, y, z, w, v, R, T, n, d, I_A, "results_model")
+        predictive_CM = model.objVal
+        save_results(model, n, T, I_A, x, y, z, R, v, w, d, A, "results_model")
 
-    num_exp = 100
-    real_CM_avg = simulate_schedule(n, T, I_A, x, y, z, v, a, A, p, k, h, b, c, R_a, num_exp)
-    real_CM_avg_rolling = simulate_rolling_schedule(model, n, T, I_A, I_minus_I_A, x, y, z, R, v, w, a, R_fix, d, A, p, k, h, b, c, num_exp)
-    results["Contribution margin predicted by expected value model"] = predictive_CM
-    results["Average realized contribution margin of schedule"] = real_CM_avg
-    results["Average realized contribution margin of rolling schedule"] = real_CM_avg_rolling
+        num_exp = 100
+        real_CM_avg_pred = simulate_schedule(n, T, I_A, x, y, z, a, A, p, k, h, b, c, R_a, num_exp)
+        real_CM_avg_rolling = simulate_rolling_schedule(model, n, T, I_A, I_minus_I_A, x, y, z, R, v, w, a, R_fix, d, A, p, k, h, b, c, num_exp)
+
+        reoptimize_subject_to_non_anticipativity(model, n, T, I_A, x, y, z, v, w, p, k, h, b, c, predictive_CM, 1.1)
+        save_results(model, n, T, I_A, x, y, z, R, v, w, d, A, "results_model_na")
+        real_CM_avg_na = simulate_schedule(n, T, I_A, x, y, z, a, A, p, k, h, b, c, R_a, num_exp)
+        results["Contribution margin predicted by expected value model"] = predictive_CM
+        results["Average realized contribution margin of predictive schedule without non-anticipativity"] = real_CM_avg_pred
+        results["Average realized contribution margin of predictive schedule with non-anticipativity"] = real_CM_avg_na
+        results["Average realized contribution margin of rolling schedule"] = real_CM_avg_rolling
 
     return results
 

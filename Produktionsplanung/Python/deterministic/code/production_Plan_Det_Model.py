@@ -1,7 +1,8 @@
-from gurobipy import GRB
+import numpy as np
 from util import *
 
-np.random.seed(101)
+
+np.random.seed(102)
 
 # set up parameters
 T = 12  # number of periods
@@ -15,7 +16,7 @@ k = [np.random.randint(10, 20) for _ in range(n)]     # production cost
 h = [np.random.uniform(0.5, 2.5) for _ in range(n)]   # holding cost
 b = [np.random.randint(5, 10) for _ in I_A]           # procurement cost of secondary materials
 c = [np.random.randint(30, 60) for _ in I_A]          # procurement cost of corresponding primary materials
-A = [[np.random.randint(15, 35) for _ in range(T)] for _ in range(m)]  # availability of secondary materials (deterministic)                             # set of all secondary materials
+A = [[np.random.randint(15, 35) for _ in range(T)] for _ in range(m)]  # availability of secondary materials (deterministic)                  # set of all secondary materials
 a = [[np.random.randint(0, 8) for _ in range(n)] for _ in range(m)]    # production coefficients
 I_minus_I_A = [i for i in range(m) if i not in I_A]   # set of non-secondary production factors
 R_fix = [[np.random.randint(50, 100) for _ in range(T)] for _ in I_minus_I_A]  # capacity of non-secondary production factors
@@ -64,6 +65,13 @@ for t in range(T):
     for j in range(n):
         model.addConstr(z[j, t] <= d[j][t], name=f"SalesConstraint_{j}_{t}")
 
+# 5. non-negativity constraints
+for t in range(T):
+    for j in range(n):
+        model.addConstr(x[j, t+1] >= 0, name=f"NonNegativityX_{j}_{t}")
+        model.addConstr(y[j, t] >= 0, name=f"NonNegativityY_{j}_{t}")
+        model.addConstr(z[j, t] >= 0, name=f"NonNegativityZ_{j}_{t}")
+
 # 6. initial inventory secondary material
 for i in I_A:
     model.addConstr(R[i, 0] == R_a[i], name=f"InventoryInitSecondary_{i}")
@@ -79,6 +87,12 @@ for t in range(T):
     for i in I_A:
         model.addConstr(v[i, t] <= A[i][t], name=f"AvailabilityConstraint_{i}_{t}")
 
+# 9. non-negativity of secondary material
+for t in range(T):
+    for i in I_A:
+        model.addConstr(R[i, t+1] >= 0, name=f"NonNegativityR_{i}_{t}")
+        model.addConstr(v[i, t] >= 0, name=f"NonNegativityV_{i}_{t}")
+        model.addConstr(w[i, t] >= 0, name=f"NonNegativityW_{i}_{t}")
 
 # solve the model
 model.optimize()
@@ -86,11 +100,17 @@ model.optimize()
 # save the solution if optimal
 if model.status == GRB.OPTIMAL:
     predictive_CM = model.objVal
-    save_results(model, x, y, z, w, v, R, T, n, d, I_A, "results_model")
+    save_results(model, n, T, I_A, x, y, z, R, v, w, d, A, "results_model")
+    num_exp = 100
+    real_CM_avg_pred = simulate_schedule(n, T, I_A, x, y, z, a, A, p, k, h, b, c, R_a, num_exp)
+    real_CM_avg_rolling = simulate_rolling_schedule(model, n, T, I_A, I_minus_I_A, x, y, z, R, v, w, a, R_fix, d, A, p, k, h, b, c, num_exp)
 
-num_exp = 100
-real_CM_avg = simulate_schedule(n, T, I_A, x, y, z, v, a, A, p, k, h, b, c, R_a, num_exp)
-real_CM_avg_rolling = simulate_rolling_schedule(model, n, T, I_A, I_minus_I_A, x, y, z, R, v, w, a, R_fix, d, A, p, k, h, b, c, num_exp)
+    reoptimize_subject_to_non_anticipativity(model, n, T, I_A, x, y, z, v, w, p, k, h, b, c, predictive_CM, 1.1)
+    save_results(model, n, T, I_A, x, y, z, R, v, w, d, A, "results_model_na")
+    real_CM_avg_na = simulate_schedule(n, T, I_A, x, y, z, a, A, p, k, h, b, c, R_a, num_exp)
+
+
 print(f"\n\nContribution margin predicted by expected value model: {predictive_CM}")
-print(f"Average realized contribution margin of schedule: {real_CM_avg}")
-print(f"Average realized contribution margin of rolling schedule: {real_CM_avg_rolling}")
+print(f"Average realized contribution margin of predictive schedule without non-anticipativity: {real_CM_avg_pred}")
+print(f"Average realized contribution margin of rolling predictive schedule: {real_CM_avg_rolling}")
+print(f"Average realized contribution margin of predictive schedule with non-anticipativity: {real_CM_avg_na}")

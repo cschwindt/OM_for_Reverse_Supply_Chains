@@ -245,13 +245,25 @@ class MainWindow(QMainWindow):
             "x_a": x_a,
             "R_a": R_a
         }
+        # choose an existed json file
+        file_path, _ = QFileDialog.getSaveFileName(self, "select a json-file with saved parameters ", "", "json-file (*.json)")
 
-        with open("results_data.json", "w") as file:
+        if not file_path:
+            return
+
+        with open(f"{file_path}", "w") as file:
              json.dump(data_to_save, file, indent=4)
 
     def load_data(self):
 
-        with open("results_data.json", "r") as file:
+        # choose an existed json file
+        file_path, _ = QFileDialog.getOpenFileName(self, "select a json-file with saved parameters ", "", "json-file (*.json)")
+
+        if not file_path:
+            return
+
+
+        with open(f"{file_path}", "r") as file:
            loaded_data = json.load(file)
     
         # Clear previous dynamic widgets

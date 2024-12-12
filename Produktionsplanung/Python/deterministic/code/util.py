@@ -1,5 +1,6 @@
 import numpy as np
 import gurobipy as gp
+from gurobipy import GRB
 
 
 def restore_model(model, n, T, I_A, I_minus_I_A, x, y, z, R, v, w, a, R_fix, d, A):
@@ -31,21 +32,27 @@ def restore_model(model, n, T, I_A, I_minus_I_A, x, y, z, R, v, w, a, R_fix, d, 
         for j in range(n):
             model.addConstr(x[j, t+1] == x[j, t] + y[j, t] - z[j, t], name=f"InventoryBalanceProduct_{j}_{t}")
             model.addConstr(z[j, t] <= d[j][t], name=f"SalesConstraint_{j}_{t}")
+            model.addConstr(x[j, t+1] >= 0, name=f"NonNegativityX_{j}_{t}")
+            model.addConstr(y[j, t] >= 0, name=f"NonNegativityY_{j}_{t}")
+            model.addConstr(z[j, t] >= 0, name=f"NonNegativityZ_{j}_{t}")
 
         for i in I_A:
             model.addConstr(
                 R[i, t + 1] == R[i, t] + v[i, t] + w[i, t] - gp.quicksum(a[i][j] * y[j, t] for j in range(n)),
                 name=f"InventoryBalanceSecondary_{i}_{t}")
             model.addConstr(v[i, t] <= A[i][t], name=f"AvailabilityConstraint_{i}_{t}")
+            model.addConstr(R[i, t+1] >= 0, name=f"NonNegativityR_{i}_{t}")
+            model.addConstr(v[i, t] >= 0, name=f"NonNegativityV_{i}_{t}")
+            model.addConstr(w[i, t] >= 0, name=f"NonNegativityW_{i}_{t}")
 
     model.update()
 
 
-def simulate_schedule(n, T, I_A, x, y, z, v, a, A, p, k, h, b, c, R_a, num_exp):
+def simulate_schedule(n, T, I_A, x, y, z, a, A, p, k, h, b, c, R_a, num_exp):
     real_CMs = []
     for ctr in range(num_exp):
         # initialize
-        np.random.seed(ctr)
+        np.random.seed(ctr+1)
         CM_without_secondary_materials_cost = sum([sum([p[j]*z[j, t].x-k[j]*y[j, t].x-h[j]*x[j, t+1].x for j in range(n)]) for t in range(T)])
         secondary_materials_cost = 0
         R_values = [R_a[i] for i in I_A]
@@ -54,12 +61,15 @@ def simulate_schedule(n, T, I_A, x, y, z, v, a, A, p, k, h, b, c, R_a, num_exp):
         for tau in range(T):
             for i in I_A:
                 # sample availability
-                realized_A = max(0, A[i][tau] + np.random.randint(-15, 15))
+                realized_A = np.random.randint(0, 2*A[i][tau])
                 R_value = R_values[i]
 
                 # compute realized purchases of secondary and primary materials
-                realized_v = min(v[i, tau].x, realized_A)
-                # realized_v = min(realized_A, max(0, sum([a[i][j] * y[j, tau].x for j in range(n)]) - R_value))
+                sum_req = sum([sum([a[i][j] * y[j, t].x for t in range(tau, T)]) for j in range(n)])
+                if R_value + realized_A <= sum_req:
+                    realized_v = realized_A
+                else:
+                    realized_v = max(0, sum_req - R_value)
                 realized_w = max(0, sum([a[i][j] * y[j, tau].x for j in range(n)]) - R_value - realized_v)
 
                 # update inventory for tau + 1
@@ -77,7 +87,7 @@ def simulate_schedule(n, T, I_A, x, y, z, v, a, A, p, k, h, b, c, R_a, num_exp):
 def simulate_rolling_schedule(model, n, T, I_A, I_minus_I_A, x, y, z, R, v, w, a, R_fix, d, A, p, k, h, b, c, num_exp):
     real_CMs_rolling = []
     for ctr in range(num_exp):
-        np.random.seed(ctr)
+        np.random.seed(ctr+1)
             
         CM_without_secondary_materials_cost = 0
         secondary_materials_cost = 0
@@ -109,11 +119,14 @@ def simulate_rolling_schedule(model, n, T, I_A, I_minus_I_A, x, y, z, R, v, w, a
                 R_value = R[i, tau].x
 
                 # sample availability
-                realized_A = max(0, A[i][tau] + np.random.randint(-15, 15))
+                realized_A = np.random.randint(0, 2*A[i][tau])
 
                 # compute realized purchases of secondary and primary materials
-                realized_v = min(v[i, tau].x, realized_A)
-                # realized_v = min(realized_A, max(0, sum([a[i][j]*y[j, tau].x for j in range(n)]) - R_value))
+                sum_req = sum([sum([a[i][j] * y[j, t].x for t in range(tau, T)]) for j in range(n)])
+                if R_value + realized_A <= sum_req:
+                    realized_v = realized_A
+                else:
+                    realized_v = max(0, sum_req - R_value)
                 realized_w = max(0, sum([a[i][j]*y[j, tau].x for j in range(n)]) - R_value - realized_v)
 
                 # fix purchase variables and inventory
@@ -131,6 +144,9 @@ def simulate_rolling_schedule(model, n, T, I_A, I_minus_I_A, x, y, z, R, v, w, a
             for i in I_A:
                 model.remove(model.getConstrByName(f"InventoryBalanceSecondary_{i}_{tau}"))
                 model.remove(model.getConstrByName(f"AvailabilityConstraint_{i}_{tau}"))
+                model.remove(model.getConstrByName(f"NonNegativityR_{i}_{tau}"))
+                model.remove(model.getConstrByName(f"NonNegativityV_{i}_{tau}"))
+                model.remove(model.getConstrByName(f"NonNegativityW_{i}_{tau}"))
             
             for i in I_minus_I_A:
                 model.remove(model.getConstrByName(f"ResourceConstraint_{i}_{tau}"))
@@ -138,6 +154,9 @@ def simulate_rolling_schedule(model, n, T, I_A, I_minus_I_A, x, y, z, R, v, w, a
             for j in range(n):
                 model.remove(model.getConstrByName(f"InventoryBalanceProduct_{j}_{tau}"))
                 model.remove(model.getConstrByName(f"SalesConstraint_{j}_{tau}"))
+                model.remove(model.getConstrByName(f"NonNegativityX_{j}_{tau}"))
+                model.remove(model.getConstrByName(f"NonNegativityY_{j}_{tau}"))
+                model.remove(model.getConstrByName(f"NonNegativityZ_{j}_{tau}"))
                 
             model.update()
 
@@ -149,7 +168,15 @@ def simulate_rolling_schedule(model, n, T, I_A, I_minus_I_A, x, y, z, R, v, w, a
     return real_CM_avg_rolling
 
 
-def save_results(model, x, y, z, w, v, R, T, n, d, I_A, filename):
+def reoptimize_subject_to_non_anticipativity(model, n, T, I_A, x, y, z, v, w, p, k, h, b, c, f_star, epsilon):
+    model.addConstr(gp.quicksum(gp.quicksum(p[j]*z[j, t] - k[j]*y[j, t] - h[j]*x[j, t+1] for j in range(n))
+                    - gp.quicksum(b[i]*v[i, t] + c[i]*w[i, t] for i in I_A) for t in range(T)) == f_star,
+                    name="OptimalityConstraint")
+    model.setObjective(gp.quicksum(gp.quicksum((1+epsilon)**t * b[i]*v[i, t] for i in I_A) for t in range(T)), GRB.MINIMIZE)
+    model.optimize()
+
+
+def save_results(model, n, T, I_A, x, y, z, R, v, w, d, A, filename):
     # check whether folder results exists; if not, create folder
     with open(f"{filename}.txt", "w") as f:
         # Summary of key metrics
@@ -168,7 +195,11 @@ def save_results(model, x, y, z, w, v, R, T, n, d, I_A, filename):
         for i in I_A:
             for t in range(T):
                 # Write rows for each secondary material i and period t
-                f.write(f"{i+1:13} | {t+1:6} | {R[i,t].x:10.2f} | {v[i,t].x:19.2f} | {w[i,t].x:20.2f} \n")
+                f.write(f"{i+1:13} | {t+1:6} | {R[i,t].x:10.2f} | {v[i,t].x:19.2f} | {w[i,t].x:20.2f}")
+                if abs(v[i,t].x-A[i][t]) < 1e-6:
+                    f.write("*\n")
+                else:
+                    f.write("\n")
 
         f.write("\n")
         

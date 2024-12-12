@@ -1,5 +1,4 @@
-from gurobipy import GRB
-import gurobipy as gp
+
 from util_sto import *
 
 np.random.seed(101)
@@ -9,8 +8,9 @@ T = 12   # number of periods
 n = 6    # number of products
 m = 4    # number of production factors
 q = 100  # number of samples
+m_a = 2  # number secondary factors
 
-I_A = range(min(2, m))
+I_A = range(min(m_a, m))
 d = [[np.random.randint(4, 8)*(1.1-np.sin(j+2*np.pi*t/T)) for t in range(T)] for j in range(n)]  # product demands
 p = [np.random.randint(120, 150) for _ in range(n)]   # product prices
 k = [np.random.randint(10, 20) for _ in range(n)]     # production cost
@@ -24,7 +24,7 @@ R_fix = [[np.random.randint(50, 100) for _ in range(T)] for _ in I_minus_I_A]  #
 x_a = [np.random.randint(3, 5) for _ in range(n)]     # initial inventory levels of products
 R_a = [np.random.randint(10, 50) for _ in I_A]        # initial inventory levels of secondary materials
 
-A_l = [[[np.random.randint(0, 2*A[i][t]) for _ in range(q)] for t in range(T)] for i in range(m)]
+A_l = [[[np.random.randint(0, m_a*A[i][t]) for _ in range(q)] for t in range(T)] for i in range(m)]
 
 # declare model
 model = gp.Model("MPS_CE_Sampling")
@@ -91,10 +91,16 @@ model.optimize()
 
 # save the solution if optimal
 if model.status == GRB.OPTIMAL:
-    predictive_CM = model.objVal
-    save_results(model, x, y, z, w, v, q, 2, R, T, n, d, I_A, "results_model")
-    print(f"\n\nContribution margin predicted by sampling approximation: {predictive_CM}")
-
-num_exp = 100
-real_CM_avg = simulate_schedule(n, T, I_A, x, y, z, a, A, p, k, h, b, c, R_a, num_exp)
-print(f"Average realized contribution margin of schedule: {real_CM_avg}")
+    predictive_CM_sa = model.objVal
+    num_exp = 100
+    real_CM_avg_sa = simulate_schedule(n, T, I_A, m_a, x, y, z, a, A, p, k, h, b, c, R_a, num_exp)
+    save_results(model, x, y, z, w, v, q, m_a, R, T, n, d, I_A, "results_model")
+    real_CM_avg_sa_na_rolling = simulate_rolling_schedule(model, n, T, q, m_a, I_A, I_minus_I_A, x, y, z, R, v, w, a, R_fix, d, A_l, p, k, h, b, c, num_exp)
+    
+    reoptimize_subject_to_non_anticipativity(model, n, T, q, I_A, x, y, z, v, w, p, k, h, b, c, predictive_CM_sa, 1.1)
+    real_CM_avg_sa_na = simulate_schedule(n, T, I_A, m_a, x, y, z, a, A, p, k, h, b, c, R_a, num_exp)
+    save_results(model, x, y, z, w, v, q, m_a, R, T, n, d, I_A, "results_model_na")
+    print(f"\n\nContribution margin predicted by sampling approximation: {predictive_CM_sa}")
+    print(f"Average realized contribution margin of sampling approximation without non-anticipativity: {real_CM_avg_sa}")
+    print(f"Average realized contribution margin of rolling schedule: {real_CM_avg_sa_na_rolling}")
+    print(f"Average realized contribution margin of sampling approximation with non-anticipativity: {real_CM_avg_sa_na}")

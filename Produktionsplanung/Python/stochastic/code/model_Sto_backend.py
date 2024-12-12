@@ -3,11 +3,11 @@ from util_sto import *
 
 np.random.seed(101)
 
-def run_gurobi_solver(n, m, alpha, T, x_a, R_a, R_fix, a, A, b, c, h, k, p , d, q):
+def run_gurobi_solver(n, m, m_a, T, x_a, R_a, R_fix, a, A, b, c, h, k, p , d, q):
     
-    I_A = range(alpha)
+    I_A = range(m_a)
     I_minus_I_A = [i for i in range(m) if i not in I_A]  
-    A_l = [[[np.random.randint(0, alpha*A[i][t]) for _ in range(q)] for t in range(T)] for i in range(m)]
+    A_l = [[[np.random.randint(0, m_a*A[i][t]) for _ in range(q)] for t in range(T)] for i in range(m)]
     
     # declare model
     model = gp.Model("MPS_CE_Sampling")
@@ -70,13 +70,20 @@ def run_gurobi_solver(n, m, alpha, T, x_a, R_a, R_fix, a, A, b, c, h, k, p , d, 
 
     # save the solution if optimal
     if model.status == GRB.OPTIMAL:
-          predictive_CM = model.objVal
-          save_results(model, x, y, z, w, v, q, alpha, R, T, n, d, I_A, "results_model")
+      predictive_CM_sa = model.objVal
+      save_results(model, x, y, z, w, v, q, m_a, R, T, n, d, I_A, "results_model")
 
-    num_exp = 100
-    real_CM_avg = simulate_schedule(n, T, I_A, x, y, z, a, A, p, k, h, b, c, R_a, num_exp)
-    results["Contribution margin predicted by expected value model"] = predictive_CM
-    results["Average realized contribution margin of schedule"] = real_CM_avg
+      real_CM_avg_sa_na_rolling = simulate_rolling_schedule(model, n, T, q, m_a, I_A, I_minus_I_A, x, y, z, R, v, w, a, R_fix, d, A_l, p, k, h, b, c, num_exp)
+
+      num_exp = 100
+      real_CM_avg_sa = simulate_schedule(n, T, I_A, x, y, z, a, A, p, k, h, b, c, R_a, num_exp)
+      reoptimize_subject_to_non_anticipativity(model, n, T, q, I_A, x, y, z, v, w, p, k, h, b, c, predictive_CM_sa, 1.1)
+      real_CM_avg_sa_na = simulate_schedule(n, T, I_A, x, y, z, a, A, p, k, h, b, c, R_a, num_exp)
+      save_results(model, x, y, z, w, v, q, m_a, R, T, n, d, I_A, "results_model_na")
+      results["Contribution margin predicted by expected value model"] = predictive_CM_sa
+      results["Average realized contribution margin of sampling approximation without non-anticipativity"] = real_CM_avg_sa
+      print(f"Average realized contribution margin of rolling schedule: {real_CM_avg_sa_na_rolling}")
+      results["Average realized contribution margin of sampling approximation with non-anticipativity"] = real_CM_avg_sa_na
 
     return results
 
