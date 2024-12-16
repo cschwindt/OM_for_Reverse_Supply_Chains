@@ -326,7 +326,7 @@ class MainWindow(QMainWindow):
         self.dynamic_layout.addWidget(label_widget, n+4, 0)
         for i in range(m):
             for t in range(T):
-                field = QLineEdit(str(loaded_data["A"][j][t]))
+                field = QLineEdit(str(loaded_data["A"][i][t]))
                 field.setMaximumWidth(50)
                 self.dynamic_layout.addWidget(field, n+i+4, t + 1)  # Add fields next to the label
                 self.dynamic_widgets[f"A-{i+1}-{t+1}"] = field   

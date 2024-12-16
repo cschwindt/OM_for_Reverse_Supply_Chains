@@ -315,7 +315,7 @@ class MainWindow(QMainWindow):
         label_widget.setFont(QFont("Georgia", 10, QFont.Bold))
         self.dynamic_layout.addWidget(label_widget, n+3, 0)
         for j in range(n):
-                field = QLineEdit(str(loaded_data[f"h"][j]))
+                field = QLineEdit(str(loaded_data["h"][j]))
                 field.setMaximumWidth(50)
                 self.dynamic_layout.addWidget(field, n+3, j + 1)  # Add fields next to the label
                 self.dynamic_widgets[f"h-{j+1}"] = field    
@@ -325,7 +325,7 @@ class MainWindow(QMainWindow):
         self.dynamic_layout.addWidget(label_widget, n+4, 0)
         for i in range(m):
             for t in range(T):
-                field = QLineEdit(str(loaded_data["A"][j][t]))
+                field = QLineEdit(str(loaded_data["A"][i][t]))
                 field.setMaximumWidth(50)
                 self.dynamic_layout.addWidget(field, n+i+4, t + 1)  # Add fields next to the label
                 self.dynamic_widgets[f"A-{i+1}-{t+1}"] = field   
@@ -334,7 +334,7 @@ class MainWindow(QMainWindow):
         label_widget.setFont(QFont("Georgia", 10, QFont.Bold))
         self.dynamic_layout.addWidget(label_widget, n+m+5, 0)
         for j in range(n):
-                field = QLineEdit(str(loaded_data[f"x_a"][j]))
+                field = QLineEdit(str(loaded_data["x_a"][j]))
                 field.setMaximumWidth(50)
                 self.dynamic_layout.addWidget(field, n+m+5, j + 1)  # Add fields next to the label
                 self.dynamic_widgets[f"x_a-{j+1}"] = field   
