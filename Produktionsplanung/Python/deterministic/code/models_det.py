@@ -1,21 +1,26 @@
 import numpy as np
 import gurobipy as gp
 from gurobipy import GRB, quicksum
+import os
+
 
 class ProductionDetPlanModel():
-    def __init__(self, n, T, m, m_a, I_A, I_minus_I_A, R_fix, a, p ,d, A, h , k, b, c, R_a, x_a):
-        #model
+    def __init__(self, n, T, m, m_a, I_A, I_minus_I_A, R_fix, a, p, d, A, h, k, b, c, R_a, x_a):
+        # model
         self.model = gp.Model("MPS_CE")
-        #parameters
-        self.n =  n
-        self.T  = T
+        self.model.params.Method = 0  # set solver to primal simplex
+        self.model.params.LPWarmStart = 2  # enforce warm starts
+        # problem sizes
+        self.n = n
+        self.T = T
         self.m_a = m_a
-        self.m =  m  
-        #set
+        self.m = m
+        # sets
         self.I_A = I_A
         self.I_minus_I_A = I_minus_I_A
+        # parameters
         self.a = a
-        self.R_fix  =R_fix
+        self.R_fix = R_fix
         self.d = d
         self.A = A 
         self.h = h
@@ -24,8 +29,8 @@ class ProductionDetPlanModel():
         self.c = c
         self.R_a = R_a
         self.x_a = x_a
-        self.p  = p
-        #decison variables
+        self.p = p
+        # decision variables
         self.x = None
         self.y = None
         self.z = None
@@ -52,12 +57,10 @@ class ProductionDetPlanModel():
         # objective function: maximize profit
         self.model.setObjective(
             quicksum(
-                quicksum(self.p[j] * self.z[j, t] - self.k[j] * self.y[j, t] - self.h[j] * self.x[j, t + 1] for j in range(self.n)) -
+                quicksum(self.p[j] * self.z[j, t] - self.k[j] * self.y[j, t] - self.h[j] * self.x[j, t + 1]
+                         for j in range(self.n)) -
                 quicksum(self.b[i] * self.v[i, t] + self.c[i] * self.w[i, t] for i in self.I_A)
-                for t in range(self.T)
-            ),
-            GRB.MAXIMIZE
-        )
+                for t in range(self.T)), GRB.MAXIMIZE)
 
         # add constraints
         self._add_constraints()
@@ -82,13 +85,15 @@ class ProductionDetPlanModel():
         # sales constraint, inventory balance, non-negativity constraints
         for t in range(self.T):
             for j in range(self.n):
-                self.model.addConstr(self.x[j, t + 1] == self.x[j, t] + self.y[j, t] - self.z[j, t], name=f"InventoryBalanceProduct_{j}_{t}")
+                self.model.addConstr(self.x[j, t + 1] == self.x[j, t] + self.y[j, t] - self.z[j, t],
+                                     name=f"InventoryBalanceProduct_{j}_{t}")
                 self.model.addConstr(self.z[j, t] <= self.d[j][t], name=f"SalesConstraint_{j}_{t}")
                 self.model.addConstr(self.x[j, t + 1] >= 0, name=f"NonNegativityX_{j}_{t}")
                 self.model.addConstr(self.y[j, t] >= 0, name=f"NonNegativityY_{j}_{t}")
                 self.model.addConstr(self.z[j, t] >= 0, name=f"NonNegativityZ_{j}_{t}")
 
-        # inventory balance constraint secondary material , non-negativity of secondary material and availability constraint secondary material
+        # inventory balance constraint secondary material, non-negativity of secondary material and
+        # availability constraint secondary material
         for t in range(self.T):
             for i in self.I_A:
                 self.model.addConstr(
@@ -132,7 +137,8 @@ class ProductionDetPlanModel():
                     name=f"ResourceConstraint_{i}_{t}")
 
             for j in range(self.n):
-                self.model.addConstr(self.x[j, t+1] == self.x[j, t] + self.y[j, t] - self.z[j, t], name=f"InventoryBalanceProduct_{j}_{t}")
+                self.model.addConstr(self.x[j, t+1] == self.x[j, t] + self.y[j, t] - self.z[j, t],
+                                     name=f"InventoryBalanceProduct_{j}_{t}")
                 self.model.addConstr(self.z[j, t] <= self.d[j][t], name=f"SalesConstraint_{j}_{t}")
                 self.model.addConstr(self.x[j, t+1] >= 0, name=f"NonNegativityX_{j}_{t}")
                 self.model.addConstr(self.y[j, t] >= 0, name=f"NonNegativityY_{j}_{t}")
@@ -140,7 +146,8 @@ class ProductionDetPlanModel():
 
             for i in self.I_A:
                 self.model.addConstr(
-                    self.R[i, t + 1] == self.R[i, t] + self.v[i, t] + self.w[i, t] - gp.quicksum(self.a[i][j] * self.y[j, t] for j in range(self.n)),
+                    self.R[i, t + 1] == self.R[i, t] + self.v[i, t] + self.w[i, t]
+                    - gp.quicksum(self.a[i][j] * self.y[j, t] for j in range(self.n)),
                     name=f"InventoryBalanceSecondary_{i}_{t}")
                 self.model.addConstr(self.v[i, t] <= self.A[i][t], name=f"AvailabilityConstraint_{i}_{t}")
                 self.model.addConstr(self.R[i, t+1] >= 0, name=f"NonNegativityR_{i}_{t}")
@@ -149,13 +156,14 @@ class ProductionDetPlanModel():
 
         self.model.update()
 
-
-    def simulate_schedule(self, num_exp):
+    def simulate_schedule(self, num_sim):
         real_CMs = []
-        for ctr in range(num_exp):
+        for ctr in range(num_sim):
             # initialize
             np.random.seed(ctr+1)
-            CM_without_secondary_materials_cost = sum([sum([self.p[j]*self.z[j, t].x-self.k[j]*self.y[j, t].x-self.h[j]*self.x[j, t+1].x for j in range(self.n)]) for t in range(self.T)])
+            CM_without_secondary_materials_cost = sum([sum([self.p[j]*self.z[j, t].x - self.k[j]*self.y[j, t].x
+                                                            - self.h[j]*self.x[j, t+1].x for j in range(self.n)])
+                                                       for t in range(self.T)])
             secondary_materials_cost = 0
             R_values = [self.R_a[i] for i in self.I_A]
 
@@ -167,15 +175,18 @@ class ProductionDetPlanModel():
                     R_value = R_values[i]
 
                     # compute realized purchases of secondary and primary materials
-                    sum_req = sum([sum([self.a[i][j] * self.y[j, t].x for t in range(tau, self.T)]) for j in range(self.n)])
+                    sum_req = sum([sum([self.a[i][j] * self.y[j, t].x for t in range(tau, self.T)])
+                                   for j in range(self.n)])
                     if R_value + realized_A <= sum_req:
                         realized_v = realized_A
                     else:
                         realized_v = max(0, sum_req - R_value)
-                    realized_w = max(0, sum([self.a[i][j] * self.y[j, tau].x for j in range(self.n)]) - R_value - realized_v)
+                    realized_w = max(0, sum([self.a[i][j] * self.y[j, tau].x for j in range(self.n)]) - R_value
+                                     - realized_v)
 
                     # update inventory for tau + 1
-                    R_values[i] = R_value + realized_v + realized_w - sum([self.a[i][j] * self.y[j, tau].x for j in range(self.n)])
+                    R_values[i] = R_value + realized_v + realized_w - sum([self.a[i][j] * self.y[j, tau].x
+                                                                           for j in range(self.n)])
 
                     secondary_materials_cost += self.b[i] * realized_v + self.c[i] * realized_w
 
@@ -185,10 +196,9 @@ class ProductionDetPlanModel():
         real_CM = np.mean(real_CMs)
         return real_CM
 
-
-    def simulate_rolling_schedule(self, num_exp, epsilon):
+    def simulate_rolling_schedule(self, num_sim, epsilon):
         real_CMs_rolling = []
-        for ctr in range(num_exp):
+        for ctr in range(num_sim):
             np.random.seed(ctr+1)
                 
             CM_without_secondary_materials_cost = 0
@@ -217,7 +227,8 @@ class ProductionDetPlanModel():
                         self.z[j, tau].LB = z_value
                         self.z[j, tau].UB = z_value
 
-                        CM_without_secondary_materials_cost += self.p[j]*z_value - self.k[j]*y_value - self.h[j]*new_x_value
+                        CM_without_secondary_materials_cost += self.p[j]*z_value - self.k[j]*y_value \
+                            - self.h[j]*new_x_value
                     
                     for i in self.I_A:
                         # retrieve R value
@@ -227,19 +238,22 @@ class ProductionDetPlanModel():
                         realized_A = np.random.randint(0, self.m_a*self.A[i][tau]+1)
 
                         # compute realized purchases of secondary and primary materials
-                        sum_req = sum([sum([self.a[i][j] * self.y[j, t].x for t in range(tau, self.T)]) for j in range(self.n)])
+                        sum_req = sum([sum([self.a[i][j] * self.y[j, t].x for t in range(tau, self.T)])
+                                       for j in range(self.n)])
                         if R_value + realized_A <= sum_req:
                             realized_v = realized_A
                         else:
                             realized_v = max(0, sum_req - R_value)
-                        realized_w = max(0, sum([self.a[i][j]*self.y[j, tau].x for j in range(self.n)]) - R_value - realized_v)
+                        realized_w = max(0, sum([self.a[i][j]*self.y[j, tau].x for j in range(self.n)]) - R_value
+                                         - realized_v)
 
                         # fix purchase variables and inventory
                         self.v[i, tau].LB = realized_v
                         self.v[i, tau].UB = realized_v
                         self.w[i, tau].LB = realized_w
                         self.w[i, tau].UB = realized_w
-                        new_R_value = R_value + realized_v + realized_w - sum([self.a[i][j]*self.y[j, tau].x for j in range(self.n)])
+                        new_R_value = R_value + realized_v + realized_w - sum([self.a[i][j]*self.y[j, tau].x
+                                                                               for j in range(self.n)])
                         self.R[i, tau+1].LB = new_R_value
                         self.R[i, tau+1].UB = new_R_value
 
@@ -272,21 +286,26 @@ class ProductionDetPlanModel():
         real_CM_avg_rolling = np.mean(real_CMs_rolling)
         return real_CM_avg_rolling
 
-
     def reoptimize_subject_to_non_anticipativity(self, f_star, epsilon):
-        self.model.addConstr(gp.quicksum(gp.quicksum(self.p[j]*self.z[j, t] - self.k[j]*self.y[j, t] - self.h[j]*self.x[j, t+1] for j in range(self.n))
-                        - gp.quicksum(self.b[i]*self.v[i, t] + self.c[i]*self.w[i, t] for i in self.I_A) for t in range(self.T)) == f_star,
-                        name="OptimalityConstraint")
-        self.model.setObjective(gp.quicksum(gp.quicksum((1+epsilon)**t * self.b[i]*self.v[i, t] for i in self.I_A) for t in range(self.T)), GRB.MINIMIZE)
+        self.model.addConstr(gp.quicksum(gp.quicksum(self.p[j]*self.z[j, t] - self.k[j]*self.y[j, t]
+                                                     - self.h[j]*self.x[j, t+1] for j in range(self.n))
+                                         - gp.quicksum(self.b[i]*self.v[i, t] + self.c[i]*self.w[i, t]
+                                                       for i in self.I_A) for t in range(self.T)) == f_star,
+                             name="OptimalityConstraint")
+        self.model.setObjective(gp.quicksum(gp.quicksum((1+epsilon)**t * self.b[i]*self.v[i, t] for i in self.I_A)
+                                            for t in range(self.T)), GRB.MINIMIZE)
         self.model.optimize()
         # reset model to original model
-        self.model.setObjective(gp.quicksum(gp.quicksum(self.p[j] * self.z[j, t] - self.k[j] * self.y[j, t] - self.h[j] * self.x[j, t + 1] for j in range(self.n))
-                        - gp.quicksum(self.b[i] * self.v[i, t] + self.c[i] * self.w[i, t] for i in self.I_A) for t in range(self.T)), GRB.MAXIMIZE)
+        self.model.setObjective(gp.quicksum(gp.quicksum(self.p[j] * self.z[j, t] - self.k[j] * self.y[j, t]
+                                                        - self.h[j] * self.x[j, t + 1] for j in range(self.n))
+                                            - gp.quicksum(self.b[i] * self.v[i, t] + self.c[i] * self.w[i, t]
+                                                          for i in self.I_A) for t in range(self.T)), GRB.MAXIMIZE)
         self.model.remove(self.model.getConstrByName(name="OptimalityConstraint"))
-
 
     def save_results(self,  filename):
         # check whether folder results exists; if not, create folder
+        if not os.path.isdir("./results"):
+            os.makedirs("./results")
         with open(f"./results/{filename}.txt", "w") as f:
             # Summary of key metrics
             f.write("Optimal circular master production schedule\n\n")
@@ -296,7 +315,8 @@ class ProductionDetPlanModel():
             for i in range(self.n):
                 for t in range(self.T):
                     # Write rows for each product i and period t
-                    f.write(f"{i+1:8} | {t+1:6} | {self.x[i,t].x:9.2f} | {self.y[i,t].x:10.2f} | {self.z[i,t].x:5.2f} | {self.d[i][t]:6.2f} \n")
+                    f.write(f"{i+1:8} | {t+1:6} | {self.x[i,t].x:9.2f} | {self.y[i,t].x:10.2f} | {self.z[i,t].x:5.2f} "
+                            f"| {self.d[i][t]:6.2f} \n")
             f.write("\n")
             f.write("---------------------------------------------------------------------------------\n")
             f.write(" Secondary m. | Period |  Inventory | Procurement sec. m. | Procurement prim. m. \n")
@@ -304,8 +324,9 @@ class ProductionDetPlanModel():
             for i in self.I_A:
                 for t in range(self.T):
                     # Write rows for each secondary material i and period t
-                    f.write(f"{i+1:13} | {t+1:6} | {self.R[i,t].x:10.2f} | {self.v[i,t].x:19.2f} | {self.w[i,t].x:20.2f}")
-                    if abs(self.v[i,t].x-self.A[i][t]) < 1e-6:
+                    f.write(f"{i+1:13} | {t+1:6} | {self.R[i,t].x:10.2f} | {self.v[i,t].x:19.2f} "
+                            f"| {self.w[i,t].x:20.2f}")
+                    if abs(self.v[i, t].x - self.A[i][t]) < 1e-6:
                         f.write("*\n")
                     else:
                         f.write("\n")
