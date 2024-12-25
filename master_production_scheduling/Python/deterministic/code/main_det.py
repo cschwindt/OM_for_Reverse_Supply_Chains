@@ -1,17 +1,16 @@
 import numpy as np
 from models_det import ProductionDetPlanModel
 
-np.random.seed(102)
-
 
 def main():
     # set up parameters
     T = 12   # number of periods
     n = 6    # number of products
     m = 4    # number of production factors
-    m_a = 2  # number of secondary factors
+    m_A = 2  # number of secondary factors
+    I_A = range(min(m_A, m))
 
-    I_A = range(min(m_a, m))
+    np.random.seed(111)
     d = [[np.random.randint(4, 8)*(1.1-np.sin(j+2*np.pi*t/T)) for t in range(T)] for j in range(n)]  # product demands
     p = [np.random.randint(120, 150) for _ in range(n)]   # product prices
     k = [np.random.randint(10, 20) for _ in range(n)]     # production cost
@@ -26,7 +25,7 @@ def main():
     R_a = [np.random.randint(10, 50) for _ in I_A]        # initial inventory levels of secondary materials
   
     # create and build model
-    productionDetPlanModel = ProductionDetPlanModel(n, T, m, m_a, I_A, I_minus_I_A, R_fix, a, p, d, A, h, k, b, c, R_a, x_a)
+    productionDetPlanModel = ProductionDetPlanModel(n, T, m, m_A, I_A, I_minus_I_A, R_fix, a, p, d, A, h, k, b, c, R_a, x_a)
     productionDetPlanModel.build_model()
     
     # evaluate predictive master production schedule
@@ -34,12 +33,12 @@ def main():
         productionDetPlanModel.save_results("results_model")
         predictive_CM = productionDetPlanModel.model.objVal
         real_CM_avg_pred = productionDetPlanModel.simulate_schedule(num_sim=100)
-        productionDetPlanModel.reoptimize_subject_to_non_anticipativity(f_star=predictive_CM, epsilon=1.1)
+        productionDetPlanModel.reoptimize_subject_to_non_anticipativity(f_star=predictive_CM, epsilon=0.1)
         productionDetPlanModel.save_results("results_model_na")
         real_CM_avg_pred_na = productionDetPlanModel.simulate_schedule(num_sim=100)
         # set epsilon to 0, if you don't want to use the model with non-anticipativity
         real_CM_avg_rolling = productionDetPlanModel.simulate_rolling_schedule(num_sim=100, epsilon=0)
-        real_CM_avg_rolling_na = productionDetPlanModel.simulate_rolling_schedule(num_sim=100, epsilon=1.1)
+        real_CM_avg_rolling_na = productionDetPlanModel.simulate_rolling_schedule(num_sim=100, epsilon=0.1)
 
         # display results in console
         print(f"\n\nContribution margin predicted by expected value model without non-anticipativity : "

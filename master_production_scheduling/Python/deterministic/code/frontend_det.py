@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout,
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QTableWidget,
                              QHBoxLayout, QLabel, QLineEdit, QPushButton, QWidget, 
                              QGridLayout, QSizePolicy, QDesktopWidget, QShortcut, QFileDialog, QMessageBox)
 from PyQt5.QtGui import QFont, QPixmap, QKeySequence
@@ -45,7 +45,7 @@ class MainWindow(QMainWindow):
         # input fields for T, n, m
         self.param_inputs = {}
         self.params = {
-            "T (periods)": 12, "n (products)": 6, "m (factors)": 4, "m_a (secondary factors)": 2
+            "T (periods)": 12, "n (products)": 6, "m (factors)": 4, "m_A (secondary factors)": 2
         }
 
         param_layout = QHBoxLayout()
@@ -144,10 +144,10 @@ class MainWindow(QMainWindow):
         T = int(self.params["T (periods)"])   # number of periods
         n = int(self.params["n (products)"])  # number of products
         m = int(self.params["m (factors)"])   # number of production factors
-        alpha = int(self.params["m_a (secondary factors)"])
-        I_A = range(alpha)
+        m_A = int(self.params["m_A (secondary factors)"])
+        I_A = range(m_A)
 
-        d = [[0.0]*T]*n
+        d = [[0.0] * T for _ in range(n)]
         for j in range(n):
             for t in range(T):
                 d[j][t] = float(self.dynamic_widgets[f"d-{j+1}-{t+1}"].text())
@@ -160,37 +160,37 @@ class MainWindow(QMainWindow):
         h = [0.0]*n
         for j in range(n):
             h[j] = float(self.dynamic_widgets[f"h-{j+1}"].text())
-        b = [0.0]*alpha
-        for i in range(alpha):
+        b = [0.0]*m_A
+        for i in range(m_A):
             b[i] = float(self.dynamic_widgets[f"b-{i+1}"].text())   
-        c = [0.0]*alpha
-        for i in range(alpha):
+        c = [0.0]*m_A
+        for i in range(m_A):
             c[i] = float(self.dynamic_widgets[f"c-{i+1}"].text()) 
-        A = [[0.0]*T]*alpha
-        for i in range(alpha):
+        A = [[0.0] * T for _ in range(m_A)]
+        for i in range(m_A):
             for t in range(T):
-                A[i][t] = float(self.dynamic_widgets[f"d-{j+1}-{t+1}"].text())
-        a = [[0.0]*n]*m
+                A[i][t] = float(self.dynamic_widgets[f"A-{i+1}-{t+1}"].text())
+        a = [[0.0] * n for _ in range(m)]
         for i in range(m):
             for j in range(n):
                 a[i][j] = float(self.dynamic_widgets[f"a-{i+1}-{j+1}"].text())
         I_minus_I_A = [i for i in range(m) if i not in I_A]  
-        R_fix = [[0.0]*T]*(m-alpha)
-        for i in range(m-alpha):
+        R_fix = [[0.0] * T for _ in range(m-m_A)]
+        for i in range(m-m_A):
             for t in range(T):
                 R_fix[i][t] = float(self.dynamic_widgets[f"R_fix-{i+1}-{t+1}"].text())
         x_a = [0.0]*n
         for j in range(n):
             x_a[j] = float(self.dynamic_widgets[f"x_a-{j+1}"].text())
-        R_a = [0.0]*alpha
-        for i in range(alpha):
+        R_a = [0.0]*m_A
+        for i in range(m_A):
             R_a[i] = float(self.dynamic_widgets[f"Ra-{i+1}"].text())
         
         data_to_save = {
             "T": T,
             "n": n,
             "m": m,
-            "alpha": alpha,
+            "m_A": m_A,
             "d": d,     
             "p": p,      
             "k": k,       
@@ -231,17 +231,17 @@ class MainWindow(QMainWindow):
         self.params["T (periods)"] = loaded_data["T"]
         self.params["n (products)"] = loaded_data["n"]
         self.params["m (factors)"] = loaded_data["m"]
-        self.params["m_a (secondary factors)"] = loaded_data["alpha"]
+        self.params["m_A (secondary factors)"] = loaded_data["m_A"]
 
         self.param_inputs["T (periods)"].setText(str(self.params["T (periods)"]))
         self.param_inputs["n (products)"].setText(str(self.params["n (products)"]))
         self.param_inputs["m (factors)"].setText(str(self.params["m (factors)"]))
-        self.param_inputs["m_a (secondary factors)"].setText(str(self.params["m_a (secondary factors)"]))
+        self.param_inputs["m_A (secondary factors)"].setText(str(self.params["m_A (secondary factors)"]))
         
         T = self.params["T (periods)"]
         n = self.params["n (products)"]
         m = self.params["m (factors)"]
-        alpha = self.params["m_a (secondary factors)"]
+        m_A = self.params["m_A (secondary factors)"]
         
         label_widget = QLabel(f"d (demands):")
         label_widget.setFont(QFont("Arial", 10, QFont.Bold))
@@ -249,6 +249,7 @@ class MainWindow(QMainWindow):
         for j in range(n):
             for t in range(T):
                 field = QLineEdit(str(loaded_data["d"][j][t]))
+                field.setCursorPosition(0)
                 field.setMaximumWidth(50)
                 self.dynamic_layout.addWidget(field, j, t + 1)  # add fields next to the label
                 self.dynamic_widgets[f"d-{j+1}-{t+1}"] = field
@@ -258,6 +259,7 @@ class MainWindow(QMainWindow):
         self.dynamic_layout.addWidget(label_widget, n+1, 0)
         for j in range(n):
             field = QLineEdit(str(loaded_data["p"][j]))
+            field.setCursorPosition(0)
             field.setMaximumWidth(50)
             self.dynamic_layout.addWidget(field, n+1, j + 1)  # add fields next to the label
             self.dynamic_widgets[f"p-{j+1}"] = field
@@ -267,6 +269,7 @@ class MainWindow(QMainWindow):
         self.dynamic_layout.addWidget(label_widget, n+2, 0)
         for j in range(n):
             field = QLineEdit(str(loaded_data["k"][j]))
+            field.setCursorPosition(0)
             field.setMaximumWidth(50)
             self.dynamic_layout.addWidget(field, n+2, j + 1)  # add fields next to the label
             self.dynamic_widgets[f"k-{j+1}"] = field
@@ -276,6 +279,7 @@ class MainWindow(QMainWindow):
         self.dynamic_layout.addWidget(label_widget, n+3, 0)
         for j in range(n):
             field = QLineEdit(str(loaded_data["h"][j]))
+            field.setCursorPosition(0)
             field.setMaximumWidth(50)
             self.dynamic_layout.addWidget(field, n+3, j + 1)  # add fields next to the label
             self.dynamic_widgets[f"h-{j+1}"] = field
@@ -283,9 +287,10 @@ class MainWindow(QMainWindow):
         label_widget = QLabel(f"A (availabilities of secondary materials):")
         label_widget.setFont(QFont("Arial", 10, QFont.Bold))
         self.dynamic_layout.addWidget(label_widget, n+4, 0)
-        for i in range(alpha):
+        for i in range(m_A):
             for t in range(T):
                 field = QLineEdit(str(loaded_data["A"][i][t]))
+                field.setCursorPosition(0)
                 field.setMaximumWidth(50)
                 self.dynamic_layout.addWidget(field, n+i+4, t + 1)  # add fields next to the label
                 self.dynamic_widgets[f"A-{i+1}-{t+1}"] = field   
@@ -295,6 +300,7 @@ class MainWindow(QMainWindow):
         self.dynamic_layout.addWidget(label_widget, n+m+5, 0)
         for j in range(n):
             field = QLineEdit(str(loaded_data["x_a"][j]))
+            field.setCursorPosition(0)
             field.setMaximumWidth(50)
             self.dynamic_layout.addWidget(field, n+m+5, j + 1)  # add fields next to the label
             self.dynamic_widgets[f"x_a-{j+1}"] = field
@@ -305,6 +311,7 @@ class MainWindow(QMainWindow):
         for i in range(m):
             for j in range(n):
                 field = QLineEdit(str(loaded_data["a"][i][j]))
+                field.setCursorPosition(0)
                 field.setMaximumWidth(50)
                 self.dynamic_layout.addWidget(field, n+m+i+6, j + 1)  # add fields next to the label
                 self.dynamic_widgets[f"a-{i+1}-{j+1}"] = field
@@ -312,8 +319,9 @@ class MainWindow(QMainWindow):
         label_widget = QLabel(f"R_a (initial inventory levels of secondary materials):")
         label_widget.setFont(QFont("Arial", 10, QFont.Bold))
         self.dynamic_layout.addWidget(label_widget, n+2*m+7, 0)
-        for i in range(alpha):
+        for i in range(m_A):
             field = QLineEdit(str(loaded_data["R_a"][i]))
+            field.setCursorPosition(0)
             field.setMaximumWidth(50)
             self.dynamic_layout.addWidget(field, n+2*m+7, i + 1)
             self.dynamic_widgets[f"Ra-{i+1}"] = field
@@ -321,8 +329,9 @@ class MainWindow(QMainWindow):
         label_widget = QLabel(f"b (procurement costs of secondary materials):")
         label_widget.setFont(QFont("Arial", 10, QFont.Bold))
         self.dynamic_layout.addWidget(label_widget, n+2*m+8, 0)
-        for i in range(alpha):
+        for i in range(m_A):
             field = QLineEdit(str(loaded_data["b"][i]))
+            field.setCursorPosition(0)
             field.setMaximumWidth(50)
             self.dynamic_layout.addWidget(field, n+2*m+8, i + 1)
             self.dynamic_widgets[f"b-{i+1}"] = field
@@ -330,8 +339,9 @@ class MainWindow(QMainWindow):
         label_widget = QLabel(f"c (procurement costs of corresponding primary materials):")
         label_widget.setFont(QFont("Arial", 10, QFont.Bold))
         self.dynamic_layout.addWidget(label_widget, n+2*m+9, 0)
-        for i in range(alpha):
+        for i in range(m_A):
             field = QLineEdit(str(loaded_data["c"][i]))
+            field.setCursorPosition(0)
             field.setMaximumWidth(50)
             self.dynamic_layout.addWidget(field, n+2*m+9, i + 1)
             self.dynamic_widgets[f"c-{i+1}"] = field
@@ -339,9 +349,10 @@ class MainWindow(QMainWindow):
         label_widget = QLabel(f"Rfix (capacities of non-secondary production factors):")
         label_widget.setFont(QFont("Arial", 10, QFont.Bold))
         self.dynamic_layout.addWidget(label_widget, n+2*m+10, 0)
-        for i in range(m-alpha):
+        for i in range(m-m_A):
             for t in range(T):
                 field = QLineEdit(str(loaded_data["R_fix"][i][t]))
+                field.setCursorPosition(0)
                 field.setMaximumWidth(50)
                 self.dynamic_layout.addWidget(field, n+2*m+10+i, t + 1)
                 self.dynamic_widgets[f"R_fix-{i+1}-{t+1}"] = field
@@ -350,11 +361,11 @@ class MainWindow(QMainWindow):
         # clear previous dynamic widgets
         self.clear_layout(self.dynamic_layout)
        
-        # get values for T, n, m
+        # get values for T, n, m, m_A
         T = int(self.param_inputs["T (periods)"].text())
         n = int(self.param_inputs["n (products)"].text())
         m = int(self.param_inputs["m (factors)"].text())
-        alpha = int(self.param_inputs["m_a (secondary factors)"].text())
+        m_A = int(self.param_inputs["m_A (secondary factors)"].text())
         
         label_widget = QLabel(f"d (demands)")
         label_widget.setFont(QFont("Arial", 10, QFont.Bold))
@@ -396,7 +407,7 @@ class MainWindow(QMainWindow):
         label_widget = QLabel(f"A (availabilities of secondary materials)")
         label_widget.setFont(QFont("Arial", 10, QFont.Bold))
         self.dynamic_layout.addWidget(label_widget, n+4, 0)
-        for i in range(alpha):
+        for i in range(m_A):
             for t in range(T):
                 field = QLineEdit()
                 field.setMaximumWidth(50)
@@ -425,7 +436,7 @@ class MainWindow(QMainWindow):
         label_widget = QLabel(f"R_a (initial inventory levels of secondary materials)")
         label_widget.setFont(QFont("Arial", 10, QFont.Bold))
         self.dynamic_layout.addWidget(label_widget, n+2*m+7, 0)
-        for i in range(alpha):
+        for i in range(m_A):
             field = QLineEdit()
             field.setMaximumWidth(50)
             self.dynamic_layout.addWidget(field, n+2*m+7, i + 1)
@@ -434,7 +445,7 @@ class MainWindow(QMainWindow):
         label_widget = QLabel(f"b (procurement costs of secondary materials)")
         label_widget.setFont(QFont("Arial", 10, QFont.Bold))
         self.dynamic_layout.addWidget(label_widget, n+2*m+8, 0)
-        for i in range(alpha):
+        for i in range(m_A):
             field = QLineEdit()
             field.setMaximumWidth(50)
             self.dynamic_layout.addWidget(field, n+2*m+8, i + 1)
@@ -443,7 +454,7 @@ class MainWindow(QMainWindow):
         label_widget = QLabel(f"c (procurement costs of corresponding primary materials)")
         label_widget.setFont(QFont("Arial", 10, QFont.Bold))
         self.dynamic_layout.addWidget(label_widget, n+2*m+9, 0)
-        for i in range(alpha):
+        for i in range(m_A):
             field = QLineEdit()
             field.setMaximumWidth(50)
             self.dynamic_layout.addWidget(field, n+2*m+9, i + 1)
@@ -452,7 +463,7 @@ class MainWindow(QMainWindow):
         label_widget = QLabel(f"Rfix (capacities of non-secondary production factors)")
         label_widget.setFont(QFont("Arial", 10, QFont.Bold))
         self.dynamic_layout.addWidget(label_widget, n+2*m+10, 0)
-        for i in range(m-alpha):
+        for i in range(m-m_A):
             for t in range(T):
                 field = QLineEdit()
                 field.setMaximumWidth(50)
@@ -488,13 +499,13 @@ class MainWindow(QMainWindow):
         T = int(params["T (periods)"])   # number of periods
         n = int(params["n (products)"])  # number of products
         m = int(params["m (factors)"])   # number of production factors
-        alpha = int(params["m_a (secondary factors)"])
+        m_A = int(params["m_A (secondary factors)"])
 
         try:
-            d = [[0.0]*T]*n
+            d = [[0.0] * T for _ in range(n)]
             for j in range(n):
                 for t in range(T):
-                    d[j][t] = float(self.dynamic_widgets[f"d-{j+1}-{t+1}"].text())*(1.1-np.sin(j+2*np.pi*t/T))
+                    d[j][t] = float(self.dynamic_widgets[f"d-{j+1}-{t+1}"].text())
             p = [0.0]*n
             for j in range(n):
                 p[j] = float(self.dynamic_widgets[f"p-{j+1}"].text())
@@ -504,29 +515,29 @@ class MainWindow(QMainWindow):
             h = [0.0]*n
             for j in range(n):
                 h[j] = float(self.dynamic_widgets[f"h-{j+1}"].text())
-            b = [0.0]*alpha
-            for i in range(alpha):
+            b = [0.0]*m_A
+            for i in range(m_A):
                 b[i] = float(self.dynamic_widgets[f"b-{i+1}"].text())   
-            c = [0.0]*alpha
-            for i in range(alpha):
-                c[i] = float(self.dynamic_widgets[f"c-{i+1}"].text()) 
-            A = [[0.0]*T]*m
-            for i in range(m):
+            c = [0.0]*m_A
+            for i in range(m_A):
+                c[i] = float(self.dynamic_widgets[f"c-{i+1}"].text())
+            A = [[0.0] * T for _ in range(m_A)]
+            for i in range(m_A):
                 for t in range(T):
-                    A[i][t] = float(self.dynamic_widgets[f"d-{j+1}-{t+1}"].text())
-            a = [[0.0]*n]*m
+                    A[i][t] = float(self.dynamic_widgets[f"A-{i+1}-{t+1}"].text())
+            a = [[0.0] * n for _ in range(m)]
             for i in range(m):
                 for j in range(n):
                     a[i][j] = float(self.dynamic_widgets[f"a-{i+1}-{j+1}"].text())
-            R_fix = [[0.0]*T]*(m-alpha)
-            for i in range(m-alpha):
+            R_fix = [[0.0] * T for _ in range(m-m_A)]
+            for i in range(m-m_A):
                 for t in range(T):
                     R_fix[i][t] = float(self.dynamic_widgets[f"R_fix-{i+1}-{t+1}"].text())
             x_a = [0.0]*n
             for j in range(n):
                 x_a[j] = float(self.dynamic_widgets[f"x_a-{j+1}"].text()) 
-            R_a = [0.0]*alpha
-            for i in range(alpha):
+            R_a = [0.0]*m_A
+            for i in range(m_A):
                 R_a[i] = float(self.dynamic_widgets[f"Ra-{i+1}"].text())
 
         except ValueError:
@@ -535,7 +546,7 @@ class MainWindow(QMainWindow):
             return  # prevent execution of solver if error occurred
         self.params = params
         # execute the solver and save the results
-        self.results = run_gurobi_solver(n, m, alpha, T, x_a, R_a, R_fix, a, A, b, c, h, k, p, d)
+        self.results = run_gurobi_solver(n, m, m_A, T, x_a, R_a, R_fix, a, A, b, c, h, k, p, d)
       
         # update the performance label
         self.update_performance_label()

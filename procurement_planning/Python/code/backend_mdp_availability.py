@@ -84,6 +84,8 @@ def run_gurobi_solver(params):
     availabilities = range(y_max + 1)        # Availability levels
 
     model = gp.Model("InventoryOptimization")
+    model.setParam(GRB.Param.OptimalityTol, 1.0e-9)
+    model.setParam(GRB.Param.FeasibilityTol, 1.0e-9)
     sigma = model.addVars(states, actions, vtype=GRB.CONTINUOUS, name="sigma(x,q)")
 
     # define feasible actions
@@ -99,16 +101,13 @@ def run_gurobi_solver(params):
     model.addConstr(gp.quicksum(
             sigma[x, q] for q in A[x] for x in states) == 1.0, name="probs_sum_to_one")
 
-    for xprime in states:
+    for x_prime in states:
         # Bellman constraint
-        model.addConstr(gp.quicksum(sigma[xprime, q] for q in A[xprime]) == gp.quicksum(
-                transition_prob(x, q, xprime, availabilities, demands, x_max, y_max, par_pY, d_max, par_pD, mu_d,
+        model.addConstr(gp.quicksum(sigma[x_prime, q] for q in A[x_prime]) == gp.quicksum(
+                transition_prob(x, q, x_prime, availabilities, demands, x_max, y_max, par_pY, d_max, par_pD, mu_d,
                                 sigma_d, mu_y, sigma_y)*sigma[x, q]
                 for q in A[x] for x in states), name="functional_equation")
 
-    for x in states:
-        for q in A[x]:
-            model.addConstr(sigma[x, q] >= 0.0, name="non-negativity")
     # solve the model
     model.optimize()
 

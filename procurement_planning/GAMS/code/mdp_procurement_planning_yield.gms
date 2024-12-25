@@ -68,7 +68,7 @@ variables
 
 equations
    def_value_function(x,q)  definition of value function
-   def_aux_obj              defintition of auxiliary objective function
+   def_aux_obj              definition of auxiliary objective function
    def_Q_value(x,q)         definition of Q-value ;
 
    def_value_function(x,q)$q_of_x(x,q)..  c + b(x) =g= r(x,q) + sum(xPrime, p(x,q,xPrime)*b(xPrime)) ;
@@ -77,13 +77,13 @@ equations
 
 model MDP / def_value_function / ;
 
-options lp = cplex
+options lp = gurobi
         decimals = 8 ;
 
 MDP.optfile = 1 ;
-$onecho > cplex.opt
-epopt 1e-5
-eprhs 1e-5
+$onecho > gurobi.opt
+epopt 1e-9
+eprhs 1e-9
 $offecho
 
 MDP.solprint = 2 ; // suppress entries in listing file

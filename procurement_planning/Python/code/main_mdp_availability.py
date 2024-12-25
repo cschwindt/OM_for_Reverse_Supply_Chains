@@ -9,16 +9,16 @@ x_max = 20    # maximum inventory level
 y_max = 15    # maximum availability
 pi = 5        # unit variable procurement cost
 h = 1         # unit holding cost
-k = 0         # fixed procurement cost
+k = 2         # fixed procurement cost
 v = 20        # unit storage cost
 par_pD = 0.4  # parameter p in distribution of demand
-par_pY = 0.3  # parameter p in distribution of yield
+par_pY = 0.3  # parameter p in distribution of availability
 
 
 states = range(-d_max, x_max + 1)       # State indices for inventory levels
 actions = range(min(y_max, x_max) + 1)  # Action indices for order quantities
-demands = range(d_max + 1)             # Demand levels
-availabilities = range(y_max + 1)      # Availability levels
+demands = range(d_max + 1)              # Demand levels
+availabilities = range(y_max + 1)       # Availability levels
 
 # define feasible actions
 A = {}
@@ -30,6 +30,8 @@ for x in states:
 
 # create the model
 model = gp.Model("InventoryOptimization")
+model.setParam(GRB.Param.OptimalityTol, 1.0e-9)
+model.setParam(GRB.Param.FeasibilityTol, 1.0e-9)
 
 # variables
 sigma = model.addVars(states, actions, vtype=GRB.CONTINUOUS, name="sigma(x,q)")
@@ -74,14 +76,10 @@ model.setObjective(gp.quicksum(reward(x, q)*sigma[x, q] for q in A[x] for x in s
 model.addConstr(gp.quicksum(
         sigma[x, q] for q in A[x] for x in states) == 1.0, name="probs_sum_to_one")
 
-for xprime in states:      
+for x_prime in states:
     # Bellman constraint
-    model.addConstr(gp.quicksum(sigma[xprime, q]for q in A[xprime]) == gp.quicksum(
-            transition_prob(x, q, xprime) * sigma[x, q] for q in A[x] for x in states), name="balance_equations")
-
-for x in states:
-    for q in A[x]:
-        model.addConstr(sigma[x, q] >= 0.0, name="non-negativity")
+    model.addConstr(gp.quicksum(sigma[x_prime, q]for q in A[x_prime]) == gp.quicksum(
+            transition_prob(x, q, x_prime) * sigma[x, q] for q in A[x] for x in states), name="balance_equations")
 
 # solve the model
 model.optimize()
@@ -106,7 +104,7 @@ if model.status == GRB.OPTIMAL:
     expected_costs = sum(reward(s, a) * sigma[s, a].x for s in states for a in actions)
     print(f"Expected cost: {-expected_costs:.4f}")
     # write the results to a file
-    with open("policy_yield_model_python.txt", "w") as f:
+    with open("policy_availability_model_python.txt", "w") as f:
         f.write(f'Optimal policy for availability model (Gurobi solver) \n\n')
         f.write(f"Inventory level | Order quantity | Probability\n")
         f.write(f'===============================================\n')

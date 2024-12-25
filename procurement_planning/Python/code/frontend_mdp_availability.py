@@ -10,7 +10,7 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtGui import QFont, QPixmap, QKeySequence
 import plotly.graph_objects as go
 from openpyxl.utils import get_column_letter
-from mdp_availability import run_gurobi_solver
+from backend_mdp_availability import run_gurobi_solver
 from PyQt5.QtCore import Qt
 import os
 
@@ -54,7 +54,7 @@ class MainWindow(QMainWindow):
         self.param_inputs = {}
         self.params = {
             "d_max": 10, "x_max": 20, "y_max": 15, "pi": 5,
-            "h": 1, "k": 0, "v": 20, "par_pD": 0.5, "par_pY": 0.5,
+            "h": 1, "k": 2, "v": 20, "par_pD": 0.4, "par_pY": 0.3,
             "mu_D": 0, "sigma_D": 0, "mu_Y": 0, "sigma_Y": 0
         }
 
@@ -275,15 +275,15 @@ class MainWindow(QMainWindow):
         self.web_view.setHtml(html)
 
     def save_to_excel(self):
-        if not (os.path.isfile("results_MDP.xlsx")):
+        if not (os.path.isfile("results_MDP_availability.xlsx")):
             workbook = openpyxl.Workbook()
-            workbook.save(filename="results_MDP.xlsx")
+            workbook.save(filename="results_MDP_availability.xlsx")
 
         # get the name of the sheet
         sheet_name, ok = QInputDialog.getText(self, "Sheet-name", "Enter a sheet-name:")
 
         if ok and sheet_name:
-            self.save_performance_results_in_excel("results_MDP.xlsx", sheet_name)
+            self.save_performance_results_in_excel("results_MDP_availability.xlsx", sheet_name)
     
     def save_performance_results_in_excel(self, filename, sheet_name):
       

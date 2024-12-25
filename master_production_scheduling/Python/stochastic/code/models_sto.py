@@ -4,8 +4,8 @@ from gurobipy import GRB, quicksum
 import os
 
 
-class ProductionStoPlanModel():
-    def __init__(self, n, T, m, q, m_a, I_A, I_minus_I_A, R_fix, a, p, d, A, A_l, h, k, b, c, R_a, x_a):
+class ProductionStoPlanModel:
+    def __init__(self, n, T, m, q, m_A, I_A, I_minus_I_A, R_fix, a, p, d, A, A_l, h, k, b, c, R_a, x_a):
         # model
         self.model = gp.Model("MPS_CE_Sampling")
         self.model.params.Method = 0  # set solver to primal simplex
@@ -13,7 +13,7 @@ class ProductionStoPlanModel():
         # parameters
         self.n = n
         self.T = T
-        self.m_a = m_a
+        self.m_A = m_A
         self.m = m
         self.q = q 
         # sets
@@ -51,9 +51,9 @@ class ProductionStoPlanModel():
         self.x = self.model.addVars(self.n, self.T + 1, name="x", vtype=GRB.CONTINUOUS)
         self.y = self.model.addVars(self.n, self.T, name="y", vtype=GRB.CONTINUOUS)
         self.z = self.model.addVars(self.n, self.T, name="z", vtype=GRB.CONTINUOUS)
-        self.v = self.model.addVars(self.m, self.T, self.q, name="v", vtype=GRB.CONTINUOUS)
-        self.w = self.model.addVars(self.m, self.T, self.q, name="w", vtype=GRB.CONTINUOUS)
-        self.R = self.model.addVars(self.m, self.T + 1, self.q, name="R", vtype=GRB.CONTINUOUS)
+        self.v = self.model.addVars(self.m_A, self.T, self.q, name="v", vtype=GRB.CONTINUOUS)
+        self.w = self.model.addVars(self.m_A, self.T, self.q, name="w", vtype=GRB.CONTINUOUS)
+        self.R = self.model.addVars(self.m_A, self.T + 1, self.q, name="R", vtype=GRB.CONTINUOUS)
 
         # objective function: maximize profit
         self.model.setObjective(
@@ -72,7 +72,7 @@ class ProductionStoPlanModel():
         for t in range(self.T):
             for i in self.I_minus_I_A:
                 self.model.addConstr(
-                    quicksum(self.a[i][j] * self.y[j, t] for j in range(self.n)) <= self.R_fix[i-self.I_A.stop][t],
+                    quicksum(self.a[i][j] * self.y[j, t] for j in range(self.n)) <= self.R_fix[i-self.m_A][t],
                     name=f"ResourceConstraint_{i}_{t}")
 
         # inventory initialization
@@ -90,9 +90,6 @@ class ProductionStoPlanModel():
                 self.model.addConstr(self.x[j, t + 1] == self.x[j, t] + self.y[j, t] - self.z[j, t],
                                      name=f"InventoryBalanceProduct_{j}_{t}")
                 self.model.addConstr(self.z[j, t] <= self.d[j][t], name=f"SalesConstraint_{j}_{t}")
-                self.model.addConstr(self.x[j, t + 1] >= 0, name=f"NonNegativityX_{j}_{t}")
-                self.model.addConstr(self.y[j, t] >= 0, name=f"NonNegativityY_{j}_{t}")
-                self.model.addConstr(self.z[j, t] >= 0, name=f"NonNegativityZ_{j}_{t}")
 
         # inventory balance constraint secondary material, non-negativity of secondary material and
         # availability constraint secondary material
@@ -104,10 +101,8 @@ class ProductionStoPlanModel():
                         quicksum(self.a[i][j] * self.y[j, t] for j in range(self.n)),
                         name=f"InventoryBalanceSecondary_{i}_{t}_{l}"
                     )
-                    self.model.addConstr(self.v[i, t, l] <= self.A_l[i][t][l], name=f"AvailabilityConstraint_{i}_{t}_{l}")
-                    self.model.addConstr(self.R[i, t + 1, l] >= 0, name=f"NonNegativityR_{i}_{t}_{l}")
-                    self.model.addConstr(self.v[i, t, l] >= 0, name=f"NonNegativityV_{i}_{t}_{l}")
-                    self.model.addConstr(self.w[i, t, l] >= 0, name=f"NonNegativityW_{i}_{t}_{l}")
+                    self.model.addConstr(self.v[i, t, l] <= self.A_l[i][t][l],
+                                         name=f"AvailabilityConstraint_{i}_{t}_{l}")
     
     def restore_model(self):
         # reset variable bounds for each simulation
@@ -133,7 +128,7 @@ class ProductionStoPlanModel():
         for t in range(self.T):
             for i in self.I_minus_I_A:
                 self.model.addConstr(
-                    gp.quicksum(self.a[i][j]*self.y[j, t] for j in range(self.n)) <= self.R_fix[i-self.I_A.stop][t],
+                    gp.quicksum(self.a[i][j]*self.y[j, t] for j in range(self.n)) <= self.R_fix[i-self.m_A][t],
                     name=f"ResourceConstraint_{i}_{t}")
 
             for j in range(self.n):
@@ -159,7 +154,7 @@ class ProductionStoPlanModel():
                 self.b[i]*self.v[i, t, l] + self.c[i]*self.w[i, t, l] for i in self.I_A) for l in range(self.q))
                                          for t in range(self.T)) == f_star, name="OptimalityConstraint")
         self.model.setObjective(gp.quicksum(gp.quicksum(gp.quicksum(
-            (1+epsilon)**t * self.b[i]*self.v[i, t, l] for i in self.I_A) for l in range(self.q))
+            (1+epsilon)**t * self.v[i, t, l] for i in self.I_A) for l in range(self.q))
                                             for t in range(self.T)), GRB.MINIMIZE)
         self.model.optimize()
         # reset model to original model
@@ -195,7 +190,7 @@ class ProductionStoPlanModel():
                         x_value = self.x[j, tau].x
                         y_value = self.y[j, tau].x
                         z_value = self.z[j, tau].x
-                        new_x_value = x_value + y_value - z_value
+                        new_x_value = max(0, x_value + y_value - z_value)  # max due to inaccuracies
 
                         # fix x, y, and z variables
                         self.x[j, tau+1].LB = new_x_value
@@ -206,14 +201,14 @@ class ProductionStoPlanModel():
                         self.z[j, tau].UB = z_value
 
                         CM_without_secondary_materials_cost += self.p[j]*z_value - self.k[j]*y_value \
-                                                               - self.h[j]*new_x_value
+                            - self.h[j]*new_x_value
                        
                     for i in self.I_A:
                         # retrieve R value
                         R_value = self.R[i, tau, 0].x
 
                         # sample availability
-                        realized_A = np.random.randint(0, self.m_a*self.A[i][tau]+1)
+                        realized_A = np.random.randint(0, 2*self.A[i][tau]+1)
 
                         # compute realized purchases of secondary and primary materials
                         sum_req = sum([sum([self.a[i][j] * self.y[j, t].x for t in range(tau, self.T)])
@@ -222,8 +217,11 @@ class ProductionStoPlanModel():
                             realized_v = realized_A
                         else:
                             realized_v = max(0, sum_req - R_value)
+
                         realized_w = max(0, sum([self.a[i][j]*self.y[j, tau].x for j in range(self.n)])
                                          - R_value - realized_v)
+
+                        secondary_materials_cost += (self.b[i] * realized_v + self.c[i] * realized_w)
 
                         # fix purchase variables and inventory
                         for l in range(self.q):
@@ -236,7 +234,6 @@ class ProductionStoPlanModel():
                             self.R[i, tau+1, l].LB = new_R_value
                             self.R[i, tau+1, l].UB = new_R_value
 
-                        secondary_materials_cost += (self.b[i] * realized_v + self.c[i] * realized_w)
                     # remove constraints for time tau
                     for l in range(self.q):
                         for i in self.I_A:
@@ -251,6 +248,7 @@ class ProductionStoPlanModel():
                         self.model.remove(self.model.getConstrByName(f"SalesConstraint_{j}_{tau}"))    
                     
                     self.model.update()
+
             total_CM = CM_without_secondary_materials_cost - secondary_materials_cost
             real_CMs_rolling.append(total_CM)
             self.restore_model()
@@ -263,7 +261,9 @@ class ProductionStoPlanModel():
         for ctr in range(num_sim):
             # initialize
             np.random.seed(ctr+1)
-            CM_without_secondary_materials_cost = sum([sum([self.p[j]*self.z[j, t].x-self.k[j]*self.y[j, t].x-self.h[j]*self.x[j, t+1].x for j in range(self.n)]) for t in range(self.T)])
+            CM_without_secondary_materials_cost = sum([sum([self.p[j]*self.z[j, t].x-self.k[j]*self.y[j, t].x
+                                                            - self.h[j]*self.x[j, t+1].x for j in range(self.n)])
+                                                       for t in range(self.T)])
             secondary_materials_cost = 0
             R_values = [self.R_a[i] for i in self.I_A]
 
@@ -271,7 +271,7 @@ class ProductionStoPlanModel():
             for tau in range(self.T):
                 for i in self.I_A:
                     # sample availability
-                    realized_A = np.random.randint(0, self.m_a*self.A[i][tau]+1)
+                    realized_A = np.random.randint(0, 2*self.A[i][tau]+1)
                     R_value = R_values[i]
 
                     # compute realized purchases of secondary and primary materials
@@ -309,23 +309,24 @@ class ProductionStoPlanModel():
             for i in range(self.n):
                 for t in range(self.T):
                     # Write rows for each product i and period t
-                    f.write(f"{i+1:8} | {t+1:6} | {self.x[i,t].x:9.2f} | {self.y[i,t].x:10.2f} | {self.z[i,t].x:5.2f} | {self.d[i][t]:6.2f} \n")
+                    f.write(f"{i+1:8} | {t+1:6} | {self.x[i,t].x:9.2f} | {self.y[i,t].x:10.2f} | {self.z[i,t].x:5.2f} "
+                            f"| {self.d[i][t]:6.2f} \n")
             f.write("\n")
             f.write("---------------------------------------------------------------------------------\n")
             f.write(" Secondary m. | Period |  Inventory | Procurement sec. m. | Procurement prim. m. \n")
             f.write("---------------------------------------------------------------------------------\n")
             
-            v_mean = [[0.0]*self.T]*self.m_a
+            v_mean = [[0.0] * self.T for _ in self.I_A]
             for i in self.I_A:
                 for t in range(self.T):
                     v_mean[i][t] = (1/self.q) * sum(self.v[i, t, l].x for l in range(self.q))
             
-            w_mean = [[0.0]*self.T]*self.m_a
+            w_mean = [[0.0] * self.T for _ in self.I_A]
             for i in self.I_A:
                 for t in range(self.T):
                     w_mean[i][t] = (1/self.q) * sum(self.w[i, t, l].x for l in range(self.q))
             
-            R_mean = [[0.0] * self.T] * self.m_a
+            R_mean = [[0.0] * self.T] * self.m_A
             for i in self.I_A:
                 for t in range(self.T):
                     R_mean[i][t] = (1/self.q)*sum(self.R[i, t, l].x for l in range(self.q))
@@ -349,4 +350,9 @@ class ProductionStoPlanModel():
             for j, sl in enumerate(service_levels):
                 f.write(f"Service level for product {j + 1}: {sl:.4f}\n")
 
-            f.write(f"Total contribution margin: {self.model.objVal:.4f}\n")
+            TCM = sum(self.p[j] * self.z[j, t].X - self.k[j] * self.y[j, t].X - self.h[j] * self.x[j, t + 1].X
+                      for j in range(self.n) for t in range(self.T)) \
+                - sum(self.b[i] * v_mean[i][t] + self.c[i] * w_mean[i][t]
+                      for i in self.I_A for t in range(self.T))
+
+            f.write(f"Total contribution margin: {TCM:.4f}\n")

@@ -4,7 +4,7 @@ $Ontext
 Course: Supply Chain Management
 Section: 2.6 Procurement in Reverse Suppy Chains
 Problem: Average-return MDP base model for procurement planning under stochastic availability and demand
-Assumption: do not pay for undelivered items (necessiates larger state space)
+Assumption: Do not pay for undelivered items
 Version 3: Avoid undershoot-specific rewards r
 
  - Model -
@@ -38,7 +38,6 @@ sets
    q_of_x(x,q)  feasible order quantities in state x
    d            demand / d0*d%DMAX% /
    y            availability / y0*y%YMAX% / ;
-*   u            undershoot q - y / u0*u%QMAX% / ;
 
 alias(x, xPrime) ;
 
@@ -48,7 +47,6 @@ parameters
    pY(y)                   probability of availability y
    p(x,q,xPrime)           transition probability from x to xPrime given action q
    r(x,q)                  expected reward for inventory x and action q ;
-*   rbar(x,q)               expected reward for inventory x and order quantity q ;
 
    val(x) = ord(x)-1-dmax ;
 
@@ -59,7 +57,6 @@ parameters
    pY(y) = binomial(ymax, ord(y)-1)*par_pY**(ord(y)-1)*(1-par_pY)**(ymax-(ord(y)-1)) ;
 
    r(x,q)$q_of_x(x,q) = -(pi*sum(y, pY(y)*min(ord(q)-1,ord(y)-1)) + h*max(0,val(x)) + k*(ord(q)>1) + v*max(0,-val(x))) ;
-*   rbar(x,q) = sum((u,y)$(ord(u)-1=max(0, ord(q)-ord(y))), pY(y)*r(x,u,q)) ;
 
    p(x,q,xPrime)$q_of_x(x,q) = sum((d,y)$((val(xPrime) = min(max(val(x),0) + min(ord(q)-1,ord(y)-1)-(ord(d)-1), xmax))), pD(d)*pY(y)) ;
 
@@ -111,9 +108,9 @@ scalars
    max_short = smax(x$((val(x) le 0) and (sum(q, def_value_function.m(x,q)>0))), -val(x)) ;
    exp_ord_quant= sum(x, sum(q, (ord(q)-1)*def_value_function.m(x,q))) ;
 
-file policy / policy_availability_model_v3.txt / ;
+file policy / policy_availability_model.txt / ;
 put policy ;
-put 'Optimal policy for availability model v3' / / ;
+put 'Optimal policy for availability model' / / ;
 put 'Inventory level', @17, '|', @19,
     'Order quantity', @34, '|', @36, 'Probability'/
     '=============================================='/
