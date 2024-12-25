@@ -273,7 +273,7 @@ class ProductionDetPlanModel:
                                          - gp.quicksum(self.b[i]*self.v[i, t] + self.c[i]*self.w[i, t]
                                                        for i in self.I_A) for t in range(self.T)) == f_star,
                              name="OptimalityConstraint")
-        self.model.setObjective(gp.quicksum(gp.quicksum((1.0+epsilon)**t * self.v[i, t] for i in self.I_A)
+        self.model.setObjective(gp.quicksum((1.0+epsilon)**t * gp.quicksum(self.v[i, t] for i in self.I_A)
                                             for t in range(self.T)), GRB.MINIMIZE)
         self.model.optimize()
         # reset model to original model

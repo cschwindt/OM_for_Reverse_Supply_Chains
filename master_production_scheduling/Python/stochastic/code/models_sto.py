@@ -153,8 +153,8 @@ class ProductionStoPlanModel:
             - (1/self.q)*gp.quicksum(gp.quicksum(
                 self.b[i]*self.v[i, t, l] + self.c[i]*self.w[i, t, l] for i in self.I_A) for l in range(self.q))
                                          for t in range(self.T)) == f_star, name="OptimalityConstraint")
-        self.model.setObjective(gp.quicksum(gp.quicksum(gp.quicksum(
-            (1+epsilon)**t * self.v[i, t, l] for i in self.I_A) for l in range(self.q))
+        self.model.setObjective(gp.quicksum((1+epsilon)**t * gp.quicksum(gp.quicksum(
+            self.v[i, t, l] for i in self.I_A) for l in range(self.q))
                                             for t in range(self.T)), GRB.MINIMIZE)
         self.model.optimize()
         # reset model to original model

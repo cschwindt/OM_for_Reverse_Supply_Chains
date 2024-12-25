@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QTableWidget,
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout,
                              QHBoxLayout, QLabel, QLineEdit, QPushButton, QWidget, 
                              QGridLayout, QSizePolicy, QDesktopWidget, QShortcut, QFileDialog, QMessageBox)
 from PyQt5.QtGui import QFont, QPixmap, QKeySequence
