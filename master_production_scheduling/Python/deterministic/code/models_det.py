@@ -8,6 +8,8 @@ class ProductionDetPlanModel:
     def __init__(self, n, T, m, m_A, I_A, I_minus_I_A, R_fix, a, p, d, A, h, k, b, c, R_a, x_a):
         # model
         self.model = gp.Model("MPS_CE")
+        self.model.params.OptimalityTol = 1e-9
+        self.model.params.FeasibilityTol = 1e-9
         self.model.params.Method = 0  # set solver to primal simplex
         self.model.params.LPWarmStart = 2  # enforce warm starts
         # problem sizes
@@ -107,19 +109,19 @@ class ProductionDetPlanModel:
         # reset variable bounds for each simulation
         for t in range(self.T):
             for j in range(self.n):
-                self.x[j, t+1].LB = 0
+                self.x[j, t+1].LB = 0.0
                 self.x[j, t+1].UB = np.inf
-                self.y[j, t].LB = 0
+                self.y[j, t].LB = 0.0
                 self.y[j, t].UB = np.inf
-                self.z[j, t].LB = 0
+                self.z[j, t].LB = 0.0
                 self.z[j, t].UB = np.inf
 
             for i in self.I_A:
-                self.R[i, t+1].LB = 0
+                self.R[i, t+1].LB = 0.0
                 self.R[i, t+1].UB = np.inf
-                self.v[i, t].LB = 0
+                self.v[i, t].LB = 0.0
                 self.v[i, t].UB = np.inf
-                self.w[i, t].LB = 0
+                self.w[i, t].LB = 0.0
                 self.w[i, t].UB = np.inf
 
         # add deleted constraints
@@ -148,10 +150,10 @@ class ProductionDetPlanModel:
         for ctr in range(num_sim):
             # initialize
             np.random.seed(ctr+1)
-            CM_without_secondary_materials_cost = sum([sum([self.p[j]*self.z[j, t].x - self.k[j]*self.y[j, t].x
-                                                            - self.h[j]*self.x[j, t+1].x for j in range(self.n)])
+            CM_without_secondary_materials_cost = sum([self.p[j]*self.z[j, t].x - self.k[j]*self.y[j, t].x
+                                                       - self.h[j]*self.x[j, t+1].x for j in range(self.n)
                                                        for t in range(self.T)])
-            secondary_materials_cost = 0
+            secondary_materials_cost = 0.0
             R_values = [self.R_a[i] for i in self.I_A]
 
             # iterate periods
@@ -162,13 +164,13 @@ class ProductionDetPlanModel:
                     R_value = R_values[i]
 
                     # compute realized purchases of secondary and primary materials
-                    sum_req = sum([sum([self.a[i][j] * self.y[j, t].x for t in range(tau, self.T)])
+                    sum_req = sum([self.a[i][j] * self.y[j, t].x for t in range(tau, self.T)
                                    for j in range(self.n)])
                     if R_value + realized_A <= sum_req:
                         realized_v = realized_A
                     else:
-                        realized_v = max(0, sum_req - R_value)
-                    realized_w = max(0, sum([self.a[i][j] * self.y[j, tau].x for j in range(self.n)]) - R_value
+                        realized_v = max(0.0, sum_req - R_value)
+                    realized_w = max(0.0, sum([self.a[i][j] * self.y[j, tau].x for j in range(self.n)]) - R_value
                                      - realized_v)
 
                     # update inventory for tau + 1
@@ -188,14 +190,14 @@ class ProductionDetPlanModel:
         for ctr in range(num_sim):
             np.random.seed(ctr+1)
                 
-            CM_without_secondary_materials_cost = 0
-            secondary_materials_cost = 0
+            CM_without_secondary_materials_cost = 0.0
+            secondary_materials_cost = 0.0
 
             # iterations of rolling horizon approach
             for tau in range(self.T):
                 # solve model with decisions fixed up to tau-1
                 if self.optimize():
-                    if epsilon > 0:
+                    if epsilon > 0.0:
                         f_star = self.model.objVal
                         self.reoptimize_subject_to_non_anticipativity(f_star, epsilon)
                     # fix variables at time tau
@@ -225,13 +227,13 @@ class ProductionDetPlanModel:
                         realized_A = np.random.randint(0, 2*self.A[i][tau]+1)
 
                         # compute realized purchases of secondary and primary materials
-                        sum_req = sum([sum([self.a[i][j] * self.y[j, t].x for t in range(tau, self.T)])
+                        sum_req = sum([self.a[i][j] * self.y[j, t].x for t in range(tau, self.T)
                                        for j in range(self.n)])
                         if R_value + realized_A <= sum_req:
                             realized_v = realized_A
                         else:
-                            realized_v = max(0, sum_req - R_value)
-                        realized_w = max(0, sum([self.a[i][j]*self.y[j, tau].x for j in range(self.n)]) - R_value
+                            realized_v = max(0.0, sum_req - R_value)
+                        realized_w = max(0.0, sum([self.a[i][j]*self.y[j, tau].x for j in range(self.n)]) - R_value
                                          - realized_v)
 
                         # fix purchase variables and inventory
