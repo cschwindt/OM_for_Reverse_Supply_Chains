@@ -4,6 +4,7 @@ import math
 import numpy as np
 import pandas as pd
 from scipy.special import erf
+from main_mdp_availability import pY
 
 
 # cumulative density function of standard normal distribution
@@ -141,5 +142,7 @@ def run_gurobi_solver(params):
     performance_results["Maximum shortage"] = max_short
     exp_ord_quant = sum(q * sigma[x, q].x for x in states for q in A[x])
     performance_results["Expected order quantity"] = exp_ord_quant
+    exp_sup_quant = sum(pY(y) * min(a, y) * sigma[s, a].x for s in states for a in actions for y in availabilities)
+    performance_results["Expected supply quantity"] = exp_sup_quant
 
     return pd.DataFrame(results), performance_results

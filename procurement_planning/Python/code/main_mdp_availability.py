@@ -9,16 +9,16 @@ x_max = 20    # maximum inventory level
 y_max = 15    # maximum availability
 pi = 5        # unit variable procurement cost
 h = 1         # unit holding cost
-k = 2         # fixed procurement cost
+k = 5         # fixed procurement cost
 v = 20        # unit storage cost
-par_pD = 0.4  # parameter p in distribution of demand
-par_pY = 0.3  # parameter p in distribution of availability
+par_pD = 0.5  # parameter p in distribution of demand
+par_pY = 0.5  # parameter p in distribution of availability
 
 
-states = range(-d_max, x_max + 1)       # State indices for inventory levels
-actions = range(min(y_max, x_max) + 1)  # Action indices for order quantities
-demands = range(d_max + 1)              # Demand levels
-availabilities = range(y_max + 1)       # Availability levels
+states = range(-d_max, x_max + 1)       # state indices for inventory levels
+actions = range(min(y_max, x_max) + 1)  # action indices for order quantities
+demands = range(d_max + 1)              # demand levels
+availabilities = range(y_max + 1)       # availability levels
 
 # define feasible actions
 A = {}
@@ -87,22 +87,25 @@ model.optimize()
 if model.status == GRB.OPTIMAL:
     # get the optimal objective function value (minimal cost per period)
     total_cost_per_period = model.objVal
-    exp_inv = sum(x*sum(sigma[x, q].x for q in A[x]) for x in states if x > 0)
-    print(f"Expected inventory level: {exp_inv:.4f}")
-    # maximal inventory 
-    max_inv = np.max([x_val for x_val in states if (x_val >= 0 and sum(sigma[x_val, q].x for q in A[x_val]) > 0)])
-    print(f"Maximal inventory level: {max_inv:.4f}")
-    # expected shortage 
-    exp_ord_quant = sum(a * sigma[s, a].x for s in states for a in actions)
-    print(f"Expected order quantity: {exp_ord_quant:.4f}")
-    # maximal shortage
-    exp_short = sum(-x*sum(sigma[x, q].x for q in A[x]) for x in states if x < 0)
-    print(f"Expected shortage cost: {exp_short:.4f}")
-    max_short = max(-x for x in states if (x < 0 and sum(sigma[x, q].x for q in A[x] if sigma[x, q].x > 0)))
-    print(f"Maximal shortage: {max_short:.4f}")
     # expected total cost
     expected_costs = sum(reward(s, a) * sigma[s, a].x for s in states for a in actions)
     print(f"Expected cost: {-expected_costs:.4f}")
+    # expected and maximal inventory level
+    exp_inv = sum(x*sum(sigma[x, q].x for q in A[x]) for x in states if x > 0)
+    print(f"Expected inventory level: {exp_inv:.4f}")
+    max_inv = np.max([x_val for x_val in states if (x_val >= 0 and sum(sigma[x_val, q].x for q in A[x_val]) > 0)])
+    print(f"Maximal inventory level: {max_inv:.4f}")
+    # expected order quantity
+    exp_ord_quant = sum(a * sigma[s, a].x for s in states for a in actions)
+    print(f"Expected order quantity: {exp_ord_quant:.4f}")
+    # expected supply quantity
+    exp_sup_quant = sum(pY(y)*min(a, y) * sigma[s, a].x for s in states for a in actions for y in availabilities)
+    print(f"Expected supply quantity: {exp_sup_quant:.4f}")
+    # expected and maximal shortage
+    exp_short = sum(-x*sum(sigma[x, q].x for q in A[x]) for x in states if x < 0)
+    print(f"Expected shortage: {exp_short:.4f}")
+    max_short = max(-x for x in states if (x < 0 and sum(sigma[x, q].x for q in A[x] if sigma[x, q].x > 0)))
+    print(f"Maximal shortage: {max_short:.4f}")
     # write the results to a file
     with open("policy_availability_model_python.txt", "w") as f:
         f.write(f'Optimal policy for availability model (Gurobi solver) \n\n')
@@ -121,6 +124,7 @@ if model.status == GRB.OPTIMAL:
         f.write(f'Expected shortage: {exp_short:.4f}\n')
         f.write(f'Maximum shortage: {max_short:.4f}\n')
         f.write(f'Expected order quantity: {exp_ord_quant:.4f}\n')
+        f.write(f'Expected supply quantity: {exp_sup_quant:.4f}\n')
 
 else:
     print("Model could not be solved to optimality.")

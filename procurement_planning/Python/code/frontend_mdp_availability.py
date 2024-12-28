@@ -54,7 +54,7 @@ class MainWindow(QMainWindow):
         self.param_inputs = {}
         self.params = {
             "d_max": 10, "x_max": 20, "y_max": 15, "pi": 5,
-            "h": 1, "k": 2, "v": 20, "par_pD": 0.4, "par_pY": 0.3,
+            "h": 1, "k": 5, "v": 20, "par_pD": 0.5, "par_pY": 0.5,
             "mu_D": 0, "sigma_D": 0, "mu_Y": 0, "sigma_Y": 0
         }
 
@@ -256,13 +256,13 @@ class MainWindow(QMainWindow):
             yaxis=dict(title="Order Quantity"),
             yaxis2=dict(
                 title="Probability",
-                overlaying='y',  # Overlay y-axis 2 on y-axis 1
-                side='right',    # Place on the right
+                overlaying='y',  # overlay y-axis 2 on y-axis 1
+                side='right',    # place on the right
                 showgrid=False
             ),
             template="plotly_dark",
             legend=dict(
-                orientation="h",  # Horizontal legend
+                orientation="h",  # horizontal legend
                 yanchor="bottom",
                 y=1.02,
                 xanchor="right",
@@ -299,9 +299,9 @@ class MainWindow(QMainWindow):
             sheet = workbook.create_sheet(sheet_name)
 
         # create a complete list of the headers: parameters and result fields
-        headers = list(self.params.keys()) + ["Expected total cost per period", "Expected Inventory",
-                                              "Maximum Inventory", "Expected Shortage", "Maximum Shortage",
-                                              "Expected Order"]
+        headers = list(self.params.keys()) + ["Expected total cost per period", "Expected inventory",
+                                              "Maximum inventory", "Expected shortage", "Maximum shortage",
+                                              "Expected order quantity", "Expected supply quantity"]
 
         # write the header to first row if the sheet is empty
         if sheet.max_row == 1 and sheet.max_column == 1 and sheet.cell(1, 1).value is None:
@@ -320,7 +320,8 @@ class MainWindow(QMainWindow):
             self.performance_results["Maximum inventory level"],
             self.performance_results["Expected shortage"], 
             self.performance_results["Maximum shortage"],
-            self.performance_results["Expected order quantity"]
+            self.performance_results["Expected order quantity"],
+            self.performance_results["Expected supply quantity"]
         ])
         # write the row
         for col, value in enumerate(row, start=1):
